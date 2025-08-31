@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PopCraft — Generator</title>
+  <style>
+    :root{ --bg:#0f1115; --panel:#16181c; --muted:#a5a5a5; --accent:#06c9d8; --accent-2:#00f5a0; --danger:#ff5c5c; --glass: rgba(255,255,255,0.03); }
+    [data-theme="light"]{ --bg:#e6f7fa; --panel:#ffffff; --muted:#3a3a3a; --accent:#06c9d8; --accent-2:#00b889; --danger:#c0392b; --glass: rgba(0,0,0,0.04);} 
+    *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,Arial;margin:0}
+    body{background:linear-gradient(180deg,#1ecbe7,#153a9b);min-height:100vh;color:#e6eef3}
+    main.container{max-width:1200px;margin:0 auto;padding:28px 20px;}
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 6px}
+    .logo{display:block;margin:0 auto;width:760px;height:140px;background:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAoAAAAEwCAYAAAB0rS8iAAAACXBIWXMAAAsTAAALEwEAmpwYAAABG0lEQVR4nO3BMQEAAADCoPVPbQ0PoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgL8GAAEYBz3YAAAAAElFTkSuQmCC') center/contain no-repeat}
+    .top-icons{display:flex;gap:12px}
+    .icon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,0.08);cursor:pointer}
+
+    .cols{display:grid;grid-template-columns:420px 1fr 320px;gap:28px;align-items:start;margin-top:12px}
+
+    /* left preview */
+    .preview-card{background:#121214;border-radius:18px;padding:24px;min-height:480px;display:flex;align-items:center;justify-content:center}
+    .preview-inner{width:320px;height:380px;border-radius:18px;background:#0f1113;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:inset 0 -8px 30px rgba(0,0,0,0.6)}
+    .preview-inner img{max-width:100%;max-height:100%;object-fit:contain}
+
+    /* center controls */
+    .controls{display:flex;flex-direction:column;gap:14px}
+    .upload-box{background:var(--accent);color:#041414;padding:18px;border-radius:12px;text-align:center;border:4px solid rgba(0,0,0,0.2)}
+    .upload-box .hint{font-weight:700;margin-bottom:8px}
+    .choose-btn{display:inline-block;padding:8px 14px;background:#081218;color:#fff;border-radius:18px;margin-top:10px;cursor:pointer}
+    .or-sep{display:flex;align-items:center;gap:10px;margin:8px 0}
+    .or-sep::before,.or-sep::after{content:'';flex:1;height:2px;background:rgba(255,255,255,0.06);border-radius:2px}
+
+    .field{display:flex;flex-direction:column;gap:6px}
+    .input,select{padding:12px;border-radius:10px;border:3px solid rgba(0,0,0,0.4);background:var(--panel);color:inherit}
+    .small{width:220px}
+
+    /* right column */
+    .right-panel{display:flex;flex-direction:column;gap:12px}
+    .right-panel .card{background:rgba(255,255,255,0.03);padding:12px;border-radius:10px}
+    .label{font-size:13px;color:var(--muted);margin-bottom:6px}
+
+    .btn-row{display:flex;gap:12px;align-items:center}
+    .btn{padding:10px 16px;border-radius:10px;border:3px solid rgba(0,0,0,0.35);background:linear-gradient(180deg,var(--accent),#00a3b0);color:#041414;font-weight:800;cursor:pointer}
+    .btn.secondary{background:linear-gradient(180deg,var(--accent-2),#00d89b);color:#041414}
+    .btn.ghost{background:transparent;color:var(--muted);border:2px dashed rgba(255,255,255,0.06)}
+
+    /* colors list */
+    .colors{display:flex;gap:8px;flex-wrap:wrap}
+    .swatch{width:60px;height:44px;border-radius:8px;border:3px solid rgba(0,0,0,0.4);cursor:pointer;display:grid;place-items:center}
+    .swatch.selected{outline:4px solid rgba(255,255,255,0.06)}
+
+    /* description */
+    .desc{background:rgba(0,0,0,0.45);padding:20px;border-radius:18px;color:#ddd;margin-top:16px}
+
+    /* modal */
+    .modal-wrap{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:200}
+    .modal{background:var(--panel);padding:18px;border-radius:12px;max-width:720px;width:92%}
+
+    /* small */
+    .muted{color:var(--muted)}
+    .danger{color:var(--danger)}
+
+    @media(max-width:1100px){.cols{grid-template-columns:1fr}}    
+  </style>
+</head>
+<body data-theme="dark">
+  <main class="container">
+    <header>
+      <div class="logo" aria-hidden></div>
+      <div class="top-icons">
+        <div class="icon" id="langBtn">🌐</div>
+        <div class="icon" id="themeBtn">🌓</div>
+      </div>
+    </header>
+
+    <section class="cols">
+      <div class="preview-card">
+        <div class="preview-inner" id="visualArea">
+          <div class="muted">Aperçu Pop</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="upload-box">
+          <div class="hint">Drag and drop skin file</div>
+          <div class="muted">PNG up to 256KB. 64x64 or 64x32 recommended</div>
+          <label class="choose-btn" id="chooseSkinBtn">Choose file<input type="file" id="skinFile" accept="image/png" style="display:none"></label>
+          <div class="or-sep">or</div>
+          <input class="input" id="username" placeholder="Minecraft username (optional)">
+          <div style="margin-top:10px;display:flex;gap:8px"><button class="btn ghost" id="fetchSkin">Get Skin</button><button class="btn ghost" id="clearSkin">Remove</button></div>
+        </div>
+
+        <div class="card">
+          <div class="field"><label class="label">Pop Name</label><input id="popName" class="input" placeholder="MyPop"></div>
+          <div style="height:8px"></div>
+          <div class="field"><label class="label">Box Color</label><div class="colors" id="colorsList"></div><div style="margin-top:8px"><button class="btn ghost" id="addColor">＋ Add / Import</button> <button class="btn ghost" id="exportTemplates">Export Box Templates</button></div></div>
+        </div>
+
+        <div class="card">
+          <div class="field"><label class="label">Version Minecraft</label><select id="versionSelect" class="input"></select></div>
+          <div class="field"><label class="label">Item</label><select id="itemSelect" class="input"></select></div>
+        </div>
+
+        <div class="card btn-row">
+          <button class="btn" id="addPop">Add a pop</button>
+          <button class="btn secondary" id="editPack">Edit existing pack</button>
+          <button class="btn" id="generate">Generate</button>
+        </div>
+
+        <div class="desc">
+          <p>This site lets you add any Minecraft skin — your own or someone else's — as a Pop figure using a resource pack. Each figure is boxed like a collectible and comes with preset packaging colors. You can also import a texture for the box or export templates to paint your own.</p>
+          <p><em>Your skin. Your box. Your Pop figure.</em></p>
+        </div>
+      </div>
+
+      <aside class="right-panel">
+        <div class="card">
+          <div class="label">Preview info</div>
+          <div style="display:flex;justify-content:space-between"><div class="muted">Name</div><div id="previewName">—</div></div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px"><div class="muted">Item</div><div id="previewItem">—</div></div>
+        </div>
+
+        <div class="card">
+          <div class="label">Base pack</div>
+          <label class="btn ghost">Choose base pack<input id="basePack" type="file" accept=".zip" style="display:none"></label>
+          <div class="muted" id="baseName">aucun</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Actions</div>
+          <div style="display:flex;gap:8px"><button class="btn ghost" id="downloadPreview">Download Preview</button><button class="btn ghost" id="saveColorToPalette">Save color</button></div>
+        </div>
+      </aside>
+    </section>
+
+    <div class="modal-wrap" id="modalWrap"><div class="modal" id="modalContent"></div></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script>
+    // state
+    const state = {
+      skinFile:null, skinURL:null, boxFile:null, baseZip:null, zip:null,
+      colors:[ {id:'blue',name:'Bleu',hex:'#00d1f3'}, {id:'purple',name:'Violet',hex:'#7b61ff'}, {id:'teal',name:'Emerald',hex:'#00f5a0'} ],
+      items:[], version:'1.21', templateModelPath:null, templateModelContent:null
+    };
+
+    // elements
+    const skinInput = document.getElementById('skinFile');
+    const chooseSkinBtn = document.getElementById('chooseSkinBtn');
+    const visualArea = document.getElementById('visualArea');
+    const usernameEl = document.getElementById('username');
+    const fetchSkinBtn = document.getElementById('fetchSkin');
+    const clearSkinBtn = document.getElementById('clearSkin');
+    const colorsList = document.getElementById('colorsList');
+    const addColorBtn = document.getElementById('addColor');
+    const exportTemplatesBtn = document.getElementById('exportTemplates');
+    const popNameEl = document.getElementById('popName');
+    const versionSelect = document.getElementById('versionSelect');
+    const itemSelect = document.getElementById('itemSelect');
+    const addPopBtn = document.getElementById('addPop');
+    const generateBtn = document.getElementById('generate');
+    const basePackInput = document.getElementById('basePack');
+    const baseName = document.getElementById('baseName');
+    const modalWrap = document.getElementById('modalWrap');
+    const modalContent = document.getElementById('modalContent');
+    const previewName = document.getElementById('previewName');
+    const previewItem = document.getElementById('previewItem');
+    const themeBtn = document.getElementById('themeBtn');
+    const langBtn = document.getElementById('langBtn');
+
+    // helpers
+    function showModal(html){ modalContent.innerHTML=html; modalWrap.style.display='flex'; document.body.style.filter='blur(2px)'; }
+    function closeModal(){ modalWrap.style.display='none'; modalContent.innerHTML=''; document.body.style.filter='none'; }
+    modalWrap.addEventListener('click', (e)=>{ if(e.target===modalWrap) closeModal(); });
+
+    // theme toggle
+    themeBtn.addEventListener('click', ()=>{ const cur = document.body.getAttribute('data-theme'); document.body.setAttribute('data-theme', cur==='dark'?'light':'dark'); });
+
+    // language button placeholder
+    langBtn.addEventListener('click', ()=>{ showModal('<h3>Choisir la langue</h3><p>Feature à implémenter — selection sauvegardée localement.</p><div style="text-align:right;margin-top:12px"><button onclick="closeModal()">Fermer</button></div>'); });
+
+    // skin upload & preview
+    skinInput.addEventListener('change', async (e)=>{ const f=e.target.files[0]; if(!f) return; await setSkinFromFile(f); });
+    chooseSkinBtn.addEventListener('click', ()=> skinInput.click());
+
+    async function setSkinFromFile(file){ state.skinFile=file; state.skinURL=URL.createObjectURL(file); renderPreview(); }
+
+    clearSkinBtn.addEventListener('click', ()=>{ state.skinFile=null; state.skinURL=null; renderPreview(); });
+
+    function renderPreview(){ visualArea.innerHTML=''; if(state.skinURL){ const img=document.createElement('img'); img.src=state.skinURL; visualArea.appendChild(img); } else { visualArea.innerHTML='<div class="muted">Aperçu Pop</div>'; } previewName.textContent = popNameEl.value || '—'; previewItem.textContent = itemSelect.value || '—'; }
+
+    // drag & drop
+    visualArea.addEventListener('dragover', e=>{ e.preventDefault(); visualArea.style.outline='4px dashed rgba(255,255,255,0.06)'; });
+    visualArea.addEventListener('dragleave', e=>{ visualArea.style.outline='none'; });
+    visualArea.addEventListener('drop', async e=>{ e.preventDefault(); visualArea.style.outline='none'; const f = e.dataTransfer.files && e.dataTransfer.files[0]; if(f && f.type.includes('png')) await setSkinFromFile(f); });
+
+    // fetch skin from crafatar
+    fetchSkinBtn.addEventListener('click', async ()=>{
+      const name = usernameEl.value.trim(); if(!name) return showModal('<p>Rentre un pseudo Minecraft.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+      try{
+        const res = await fetch(`https://crafatar.com/skins/${encodeURIComponent(name)}`);
+        if(!res.ok) return showModal('<p>Impossible de récupérer le skin.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+        const blob = await res.blob(); const file = new File([blob],'skin.png',{type:blob.type}); await setSkinFromFile(file);
+      }catch(e){ showModal('<p>Erreur réseau.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>'); }
+    });
+
+    // colors
+    function renderColors(){ colorsList.innerHTML=''; state.colors.forEach(c=>{ const el=document.createElement('div'); el.className='swatch'; el.style.background=c.hex; el.title=c.name; el.dataset.id=c.id; el.addEventListener('click', ()=>{ selectColor(c.id); }); colorsList.appendChild(el); }); }
+    function selectColor(id){ state.colors.forEach(c=>c.selected=false); const c=state.colors.find(x=>x.id===id); if(c) c.selected=true; renderColors(); // change preview bg
+      const hex=c?c.hex:'#0f1113'; visualArea.style.background=`linear-gradient(180deg, ${hex}, #0f1113)`; }
+    addColorBtn.addEventListener('click', ()=>{ showModal(`<h3>Ajouter / importer couleur</h3><div style="display:flex;gap:8px;margin-top:8px"><input id="ncname" placeholder="Nom couleur" class="input"><input id="nchex" placeholder="#00ffcc" class="input"></div><div style="margin-top:8px"><label class="btn ghost">Uploader texture<input id="ncfile" type="file" accept="image/png" style="display:none"></label></div><div style="text-align:right;margin-top:12px"><button onclick="(function(){ const name=document.getElementById('ncname').value||'Perso'; const hex=document.getElementById('nchex').value||'#a5a5a5'; state.colors.push({id:'c'+Date.now(),name,hex}); renderColors(); closeModal(); })()">Ajouter</button></div>`); });
+
+    exportTemplatesBtn.addEventListener('click', ()=>{ // simple exports
+      const blank = base64ToBlob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=','image/png'); saveAs(blank,'box_template_blank.png'); const gray = base64ToBlob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=','image/png'); saveAs(gray,'box_template_grayscale.png'); showModal('<p>Templates exportés (fichiers d\'exemple).</p><div style="text-align:right;margin-top:12px"><button onclick="closeModal()">OK</button></div>'); });
+    function base64ToBlob(b64, type){ const bin = atob(b64); const len = bin.length; const arr = new Uint8Array(len); for(let i=0;i<len;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type}); }
+
+    // versions
+    const versions = ['1.21','1.20.6','1.20.4','1.20.1'];
+    function populateVersions(){ versions.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; if(v===state.version) o.selected=true; versionSelect.appendChild(o); }); }
+    versionSelect.addEventListener('change', ()=>{ state.version = versionSelect.value; fetchItems(state.version); });
+
+    async function fetchItems(ver){ try{ itemSelect.innerHTML='<option>Loading…</option>'; const res = await fetch(`https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/${ver}/items.json`); if(!res.ok) throw new Error('fail'); const data = await res.json(); state.items = data.map(it=>it.name); itemSelect.innerHTML=''; state.items.forEach(it=>{ const o=document.createElement('option'); o.value=o.textContent=it; itemSelect.appendChild(o); }); }catch(e){ itemSelect.innerHTML='<option>Erreur chargement</option>'; } }
+
+    populateVersions(); fetchItems(state.version);
+
+    // base pack handling
+    basePackInput.addEventListener('change', async e=>{ const f=e.target.files[0]; if(!f) return; baseName.textContent = f.name; state.baseZip = f; state.zip = await JSZip.loadAsync(f); // detect template
+      const keys = Object.keys(state.zip.files);
+      for(const k of keys){ if(k.includes('assets/minecraft/models/block/pop/') && k.toLowerCase().includes('nompop')){ state.templateModelPath = k; state.templateModelContent = await state.zip.file(k).async('string'); break; } }
+      showModal('<p>Pack de base chargé.</p><div style="text-align:right;margin-top:12px"><button onclick="closeModal()">OK</button></div>'); });
+
+    // duplicate name check
+    popNameEl.addEventListener('input', async ()=>{ const name = popNameEl.value.trim(); if(!name){ popNameEl.style.borderColor=''; return; } if(await nameExistsInZip(name)){ popNameEl.style.borderColor='red'; } else popNameEl.style.borderColor=''; });
+
+    async function nameExistsInZip(name){ if(!state.zip) return false; const keys = Object.keys(state.zip.files); for(const k of keys){ if(k.endsWith('.json')){ const txt = await state.zip.file(k).async('string'); if(txt.includes(name)) return true; } } return false; }
+
+    // add pop (create files inside zip)
+    addPopBtn.addEventListener('click', async ()=>{
+      const name = popNameEl.value.trim(); if(!name) return showModal('<p>Donne un nom pour la Pop.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+      if(await nameExistsInZip(name)) return showModal('<p>Nom déjà existant dans le pack.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+      if(!state.zip) return showModal('<p>Charge un pack de base d\'abord.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+
+      // textures
+      const texFolder = `assets/minecraft/textures/item/${name}/`;
+      if(state.skinFile) state.zip.file(texFolder+'skin.png', state.skinFile);
+      // chosen color -> use hex to make a small png? For now allow user to add box texture via import later. We'll add a placeholder
+      // model
+      if(state.templateModelContent){ let newModel = state.templateModelContent.replace(/nompop/g, name).replace(/pop4/g,name); state.zip.file(`assets/minecraft/models/block/pop/${name}.json`, newModel); }
+      else { const minimal = JSON.stringify({format_version:'1.21.6',textures:{'1':`item/${name}/skin`,'2':`item/${name}/box_texture`}},null,2); state.zip.file(`assets/minecraft/models/block/pop/${name}.json`, minimal); }
+
+      // item json editing
+      const itemKey = `assets/minecraft/items/${itemSelect.value.replace(':','_')}.json`;
+      let arr=[];
+      if(state.zip.file(itemKey)){ try{ const txt=await state.zip.file(itemKey).async('string'); arr = JSON.parse(txt); if(!Array.isArray(arr)) arr = arr.items || [] }catch(e){ arr = []; } }
+      const whenObj = { when:[name,name.toLowerCase(),`ipattern:${name}`,`iregex:.${name}.`], model:{ type:'minecraft:model', model:`minecraft:block/pop/${name}` } };
+      arr.push(whenObj);
+      state.zip.file(itemKey, JSON.stringify(arr,null,2));
+
+      showModal(`<p>Pop ${name} ajoutée (fichiers créés dans le zip en mémoire).</p><div style="text-align:right;margin-top:12px"><button onclick="closeModal()">OK</button></div>`);
+    });
+
+    // generate pack
+    generateBtn.addEventListener('click', async ()=>{
+      if(!state.zip) return showModal('<p>Charge un pack de base.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+      // verify no placeholders
+      const keys = Object.keys(state.zip.files); const leftovers=[];
+      for(const k of keys){ if(k.endsWith('.json')){ const txt = await state.zip.file(k).async('string'); if(txt.includes('<nompop>') || txt.includes('nompop')) leftovers.push(k); } }
+      if(leftovers.length) return showModal(`<p>Erreur : des placeholders restent :<br>${leftovers.slice(0,20).join('<br>')}</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>`);
+      // check item exists in selected version
+      if(state.items && !state.items.includes(itemSelect.value)){
+        const ask = confirm('L\'item sélectionné n\'existe pas dans la version '+state.version+'. Continuer ?'); if(!ask) return;
+      }
+      const blob = await state.zip.generateAsync({type:'blob'});
+      saveAs(blob, 'PopCraft_custom.zip');
+    });
+
+    // small helpers
+    renderColors(); function renderColors(){ colorsList.innerHTML=''; state.colors.forEach(c=>{ const el=document.createElement('div'); el.className='swatch'; el.style.background=c.hex; el.title=c.name; el.addEventListener('click', ()=>{ selectColor(c.id); }); colorsList.appendChild(el); }); }
+    function selectColor(id){ state.colors.forEach(c=>c.selected=false); const c=state.colors.find(x=>x.id===id); if(c) c.selected=true; renderColors(); visualArea.style.background=`linear-gradient(180deg, ${c.hex}, #0f1113)`; }
+
+    // initialize
+    renderColors(); populateVersions(); fetchItems(state.version);
+
+    // export preview (simple skin file)
+    document.getElementById('downloadPreview').addEventListener('click', ()=>{ if(!state.skinFile) return showModal('<p>Aucun skin à télécharger.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>'); saveAs(state.skinFile, 'skin.png'); });
+
+  </script>
+</body>
+</html>
