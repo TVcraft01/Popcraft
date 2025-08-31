@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PopCraft — Generator</title>
+  <style>
+    :root{
+      --bg:#0f1115; --panel:#16181c; --muted:#a5a5a5; --accent:#6ee7b7; --danger:#ff5c5c; --glass: rgba(255,255,255,0.04);
+    }
+    [data-theme="light"]{ --bg:#f7f7f8; --panel:#ffffff; --muted:#666; --accent:#0ea5a6; --danger:#c0392b; --glass: rgba(0,0,0,0.04);} 
+    *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,Arial;margin:0}
+    body{background:linear-gradient(180deg,var(--bg),#070709);color:#e6eef3;min-height:100vh;padding:22px;transition:background .25s}
+    .app{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:20px}
+    header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .sun, .moon, .globe{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;background:var(--panel);cursor:pointer}
+    .title{font-weight:800;font-size:18px}
+
+    /* Left panel */
+    .panel{background:var(--panel);padding:16px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6)}
+
+    .big-rect{height:220px;border-radius:10px;background:linear-gradient(180deg,#1b1d22,#111214);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;border:2px dashed rgba(255,255,255,0.06)}
+    .big-rect input{position:absolute;inset:0;opacity:0;cursor:pointer}
+    .big-rect .hint{color:var(--muted);text-align:center}
+    .big-rect img{max-height:100%;max-width:100%;object-fit:contain}
+    .remove-skin{position:absolute;right:8px;top:8px;background:rgba(0,0,0,0.5);border-radius:6px;padding:6px;display:none}
+
+    .row{display:flex;gap:12px;margin-top:12px}
+    .col{flex:1}
+    label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+    input[type=text],select{width:100%;padding:10px;border-radius:8px;border:2px solid transparent;background:var(--glass);color:inherit}
+    input[type=file]{display:none}
+    button{padding:10px 14px;border-radius:8px;border:0;background:var(--accent);color:#062224;font-weight:700;cursor:pointer}
+    .secondary{background:transparent;border:2px solid rgba(255,255,255,0.05);color:var(--muted)}
+
+    /* colors list */
+    .colors{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .color-swatch{width:44px;height:44px;border-radius:8px;border:2px solid rgba(0,0,0,0.5);cursor:pointer;display:grid;place-items:center}
+    .color-swatch.selected{outline:3px solid rgba(255,255,255,0.06)}
+    .color-add{display:flex;align-items:center;gap:8px}
+
+    /* right panel preview */
+    .preview{display:flex;flex-direction:column;align-items:center;gap:12px}
+    .pop-view{width:320px;height:420px;background:linear-gradient(180deg,#0b0b0b,#141414);border-radius:12px;display:flex;align-items:center;justify-content:center;position:relative}
+    .pop-view img{max-width:100%;max-height:100%}
+
+    /* footer actions */
+    .actions{display:flex;gap:10px;margin-top:12px}
+
+    /* modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:100}
+    .modal{background:var(--panel);padding:20px;border-radius:10px;max-width:720px;width:92%}
+
+    /* small helpers */
+    .muted{color:var(--muted)}
+    .danger{color:var(--danger)}
+    .hidden{display:none}
+
+    /* responsive */
+    @media(max-width:960px){.app{grid-template-columns:1fr;}.preview{order:-1}}
+
+    /* subtle animations */
+    .fade-in{animation:fade .25s ease both}
+    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  </style>
+</head>
+<body data-theme="dark">
+  <div class="app">
+    <header>
+      <div class="brand"><div class="title">PopCraft</div>
+        <div class="muted">— home</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div title="Langue" class="globe" id="langBtn">🌐</div>
+        <div title="Mode" class="sun" id="themeBtn">🌙</div>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="big-rect" id="dropZone">
+        <div class="hint" id="dropHint">Glisser / déposer ou cliquer pour importer un skin (png)</div>
+        <img id="skinPreview" class="hidden" alt="skin preview">
+        <button class="remove-skin" id="removeSkin">✕</button>
+        <input id="skinFile" type="file" accept="image/png">
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Pseudo Minecraft (optionnel)</label>
+          <div style="display:flex;gap:8px"><input id="username" type="text" placeholder="ex: Notch"><button id="fetchSkin" class="secondary">Récupérer</button></div>
+        </div>
+        <div class="col">
+          <label>Importer pack modèle (.zip)</label>
+          <div style="display:flex;gap:8px"><label class="secondary" style="padding:10px;border-radius:8px;cursor:pointer"><input id="basePack" type="file" accept=".zip">Choisir</label><span id="baseName" class="muted">aucun</span></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Nom de la Pop (in-game)</label>
+          <input id="popName" type="text" placeholder="ex: MyPop" />
+        </div>
+        <div class="col">
+          <label>Version Minecraft</label>
+          <select id="versionSelect"></select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Item (sélecteur)</label>
+          <select id="itemSelect"></select>
+        </div>
+      </div>
+
+      <div style="margin-top:10px" class="panel">
+        <label>Couleur de la boîte</label>
+        <div class="colors" id="colorsList"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+          <label class="secondary" id="addColorBtn" style="cursor:pointer;padding:8px">＋ Ajouter / Importer</label>
+          <button id="exportTemplates" class="secondary">Exporter modèles boîte</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Options</label>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="addPop" class="secondary">Add new Pop</button>
+          <button id="generatePack">Générer / Télécharger</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px" class="muted">Remarques : les pop-up de confirmation apparaissent au centre et floutent le fond.</div>
+    </section>
+
+    <aside class="panel preview">
+      <div class="pop-view" id="visual">
+        <div class="muted">Aperçu Pop</div>
+      </div>
+      <div style="width:100%">
+        <label>Preview info</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <div class="muted">Nom :</div><div id="previewName">—</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <div class="muted">Item :</div><div id="previewItem">—</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- modal backdrop -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal" id="modalContent"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script>
+    const state = { skinBlob:null, basePackZip:null, baseZipFiles:null, colors:[{id:'blue',name:'Bleu',hex:'#3b82f6'},{id:'red',name:'Rouge',hex:'#ef4444'},{id:'green',name:'Vert',hex:'#10b981'}], theme:'dark', version:'1.21'};
+    const itemSelect=document.getElementById('itemSelect');
+    const versionSelect=document.getElementById('versionSelect');
+
+    const versions=['1.21','1.20.6','1.20.4','1.20.1'];
+    function populateVersions(){ versions.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; if(v===state.version) o.selected=true; versionSelect.appendChild(o)}); }
+
+    async function fetchItems(ver){
+      try{
+        const res = await fetch(`https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/${ver}/items.json`);
+        if(!res.ok) throw new Error('fetch fail');
+        const data = await res.json();
+        state.itemsList = data.map(it=>it.name);
+        renderItems();
+      }catch(e){ console.error(e); itemSelect.innerHTML='<option>Erreur de chargement</option>'; }
+    }
+    function renderItems(){ itemSelect.innerHTML=''; state.itemsList.forEach(it=>{ const o=document.createElement('option'); o.value=o.textContent=it; itemSelect.appendChild(o)}); }
+
+    versionSelect.addEventListener('change',()=>{ state.version=versionSelect.value; fetchItems(state.version); });
+
+    populateVersions();
+    fetchItems(state.version);
+  </script>
+</body>
+</html>
