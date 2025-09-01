@@ -4,54 +4,46 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>PopCraft — Generator</title>
+  <title>PopCraft — Generator (final)</title>
   <style>
-    :root{ --bg:#0f1115; --panel:#0d0e10; --muted:#bfc9cf; --accent:#06c9d8; --accent-2:#00f5a0; --danger:#ff5c5c; }
+    :root{--bg:#0f1115;--panel:#0d0e10;--muted:#bfc9cf;--accent:#06c9d8;--accent-2:#00f5a0;--danger:#ff5c5c}
     *{box-sizing:border-box;font-family:Inter,Segoe UI,Roboto,Arial;margin:0}
     body{background:var(--bg);min-height:100vh;color:#e6eef3}
-    main.container{max-width:1200px;margin:0 auto;padding:20px}
+    main.container{max-width:1200px;margin:0 auto;padding:18px}
     header{position:relative;height:140px;display:flex;align-items:center;justify-content:center}
-    /* diagonal band behind logo */
     header::before{content:'';position:absolute;left:-30%;top:-40px;width:160%;height:220px;transform:rotate(-12deg);background:linear-gradient(90deg,#1ecbe7,#153a9b);opacity:0.95;border-radius:6px}
-    .logo{position:relative;z-index:2;height:120px;background:transparent center/contain no-repeat}
+    #logo{position:relative;z-index:2;height:120px;background:transparent center/contain no-repeat}
     .top-icons{position:absolute;right:14px;top:14px;display:flex;gap:10px;z-index:3}
-    .icon{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,0.03);cursor:pointer}.cols{display:grid;grid-template-columns:420px 1fr 320px;gap:20px;align-items:start;margin-top:6px}
+    .icon{width:40px;height:40px;border-radius:8px;display:grid;place-items:center;background:rgba(255,255,255,0.03);cursor:pointer}.cols{display:grid;grid-template-columns:420px 1fr 320px;gap:18px;align-items:start;margin-top:6px}
 
-/* left preview */
 .preview-card{background:#0b0b0b;border-radius:14px;padding:12px;min-height:520px;display:flex;align-items:center;justify-content:center}
 #viewer{width:320px;height:420px;border-radius:10px;overflow:hidden;background:#070707;display:flex;align-items:center;justify-content:center}
-#viewer .muted{color:#9aa4ab}
+#viewer .muted{color:#9aa4ab;text-align:center;padding:12px}
 
-/* center controls */
-.controls{display:flex;flex-direction:column;gap:14px}
-.upload-box{background:linear-gradient(180deg,#0b0b0b,#0b0b0b);color:#cfeff4;padding:16px;border-radius:12px;text-align:center;border:1px solid rgba(255,255,255,0.04)}
+.controls{display:flex;flex-direction:column;gap:12px}
+.upload-box{background:linear-gradient(180deg,#0b0b0b,#0b0b0b);color:#cfeff4;padding:14px;border-radius:12px;text-align:center;border:1px solid rgba(255,255,255,0.04)}
 .hint{font-weight:800;margin-bottom:6px;color:var(--accent)}
-.choose-btn{display:inline-block;padding:8px 14px;background:transparent;color:#fff;border-radius:8px;margin-top:8px;cursor:pointer;border:1px solid rgba(255,255,255,0.06)}
+.btn-file{display:inline-block;padding:10px 12px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;cursor:pointer}
 .or-sep{display:flex;align-items:center;gap:10px;margin:10px 0}
 .or-sep::before,.or-sep::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.04)}
 
 .field{display:flex;flex-direction:column;gap:6px}
 .input,select{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:#0f1112;color:#fff}
-
 .actions-row{display:flex;gap:8px;justify-content:center;margin-top:8px}
 .btn{padding:10px 14px;border-radius:8px;border:0;background:var(--accent);color:#041414;font-weight:700;cursor:pointer}
 .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#cfeff4}
 .btn.alt{background:var(--accent-2)}
 
-/* right column */
 .right-panel{display:flex;flex-direction:column;gap:12px}
 .card{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px}
 .label{font-size:13px;color:#9aa4ab;margin-bottom:6px}
 .colors{display:flex;gap:8px;flex-wrap:wrap}
 .swatch{width:56px;height:40px;border-radius:8px;border:2px solid rgba(0,0,0,0.4);cursor:pointer}
 .swatch.selected{outline:3px solid rgba(255,255,255,0.06)}
-
 .desc{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;color:#cfeff4}
 
-/* modal */
 .modal-wrap{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:200}
 .modal{background:var(--panel);padding:16px;border-radius:10px;max-width:720px;width:92%;color:#fff}
-
 .blurred{filter:blur(3px)}
 
 @media(max-width:980px){.cols{grid-template-columns:1fr}}
@@ -61,21 +53,19 @@
 <body>
   <main class="container" id="app">
     <header>
-      <div id="logo" class="logo" aria-hidden></div>
-      <div class="top-icons">
-        <div id="langBtn" class="icon" title="Langue">🌐</div>
-        <div id="themeBtn" class="icon" title="Theme">🌓</div>
-      </div>
+      <div id="logo"></div>
+      <div class="top-icons"><div id="langBtn" class="icon">🌐</div><div id="themeBtn" class="icon">🌓</div></div>
     </header><section class="cols">
-  <div class="preview-card">
-    <div id="viewer"> <div class="muted">Chargement du modèle...</div> </div>
-  </div>
+  <div class="preview-card"><div id="viewer"><div class="muted">Chargement du modèle...</div></div></div>
 
   <div class="controls">
     <div class="upload-box">
       <div class="hint">Importer un skin</div>
       <div class="muted">PNG (64x64 ou 64x32). Drag & drop ou uploader.</div>
-      <div style="margin-top:8px"><input id="skinFile" type="file" accept="image/png" style="display:none"><label class="choose-btn" id="chooseSkin">Choisir un fichier</label></div>
+      <div style="margin-top:8px;display:flex;gap:8px;justify-content:center">
+        <button id="chooseSkin" class="btn-file">Importer skin</button>
+        <input id="skinFile" type="file" accept="image/png" style="display:none">
+      </div>
       <div class="or-sep">ou</div>
       <input id="username" class="input" placeholder="Pseudo Minecraft (optionnel)">
       <div class="actions-row"><button id="fetchSkin" class="btn ghost">Récupérer</button><button id="clearSkin" class="btn ghost">Retirer</button></div>
@@ -84,7 +74,7 @@
     <div class="card">
       <div class="field"><label class="label">Nom de la Pop</label><input id="popName" class="input" placeholder="MonPop"></div>
       <div style="height:10px"></div>
-      <div class="field"><label class="label">Couleur de la boîte</label><div id="colorsList" class="colors"></div><div style="margin-top:8px"><button id="addColor" class="btn ghost">＋ Importer</button> <button id="exportTemplates" class="btn ghost">Exporter modèle boîte</button></div></div>
+      <div class="field"><label class="label">Couleur de la boîte</label><div id="colorsList" class="colors"></div><div style="margin-top:8px;display:flex;gap:8px"><button id="addColor" class="btn-file">＋ Importer</button><button id="exportTemplates" class="btn-file">Exporter modèle</button></div></div>
     </div>
 
     <div class="card">
@@ -97,13 +87,12 @@
       <button id="addPop" class="btn">Add new pop</button>
       <button id="generate" class="btn alt">Générer & Télécharger</button>
     </div>
-
   </div>
 
   <aside class="right-panel">
     <div class="card">
       <div class="label">Pack de base</div>
-      <label class="btn ghost">Choisir pack<input id="basePack" type="file" accept=".zip" style="display:none"></label>
+      <div style="display:flex;gap:8px;align-items:center"><button id="choosePack" class="btn-file">Choisir pack</button><input id="basePack" type="file" accept=".zip" style="display:none"></div>
       <div id="baseName" class="muted">aucun</div>
     </div>
 
@@ -113,249 +102,182 @@
       <div style="display:flex;justify-content:space-between;margin-top:6px"><div class="muted">Item</div><div id="previewItem">—</div></div>
     </div>
 
-    <div class="desc">Les pop-up apparaissent au centre, le contenu est lisible. Si l'item n'existe pas dans la version choisie, une alerte s'affichera lors de la génération.</div>
+    <div class="desc">Si le modèle ne s'affiche pas, vérifie que <code>pop.obj</code> et <code>box_template_blank.png</code> sont à la racine (même dossier que index.html).</div>
   </aside>
 </section>
 
 <div class="modal-wrap" id="modalWrap"><div class="modal" id="modalContent"></div></div>
 
-  </main>  <!-- three.js modules -->  <script type="module">
+  </main>  <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.150.1/build/three.module.js';
     import { OBJLoader } from 'https://unpkg.com/three@0.150.1/examples/jsm/loaders/OBJLoader.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.150.1/examples/jsm/controls/OrbitControls.js';
 
-    // UI elements
+    // elements
     const logo = document.getElementById('logo');
+    const viewer = document.getElementById('viewer');
     const skinFileInput = document.getElementById('skinFile');
-    const chooseSkin = document.getElementById('chooseSkin');
-    const username = document.getElementById('username');
+    const chooseSkinBtn = document.getElementById('chooseSkin');
+    const usernameEl = document.getElementById('username');
     const fetchSkinBtn = document.getElementById('fetchSkin');
     const clearSkinBtn = document.getElementById('clearSkin');
     const colorsList = document.getElementById('colorsList');
     const addColorBtn = document.getElementById('addColor');
     const exportTemplatesBtn = document.getElementById('exportTemplates');
-    const popName = document.getElementById('popName');
+    const popNameEl = document.getElementById('popName');
     const versionSelect = document.getElementById('versionSelect');
     const itemSelect = document.getElementById('itemSelect');
     const addPopBtn = document.getElementById('addPop');
     const generateBtn = document.getElementById('generate');
+    const choosePackBtn = document.getElementById('choosePack');
     const basePackInput = document.getElementById('basePack');
     const baseName = document.getElementById('baseName');
     const modalWrap = document.getElementById('modalWrap');
     const modalContent = document.getElementById('modalContent');
     const previewName = document.getElementById('previewName');
     const previewItem = document.getElementById('previewItem');
-    const viewer = document.getElementById('viewer');
 
     // state
-    const state = {
-      skinFile: null,
-      skinURL: null,
-      baseZip: null,
-      zip: null,
-      colors: [ {id:'blue',hex:'#00d1f3'}, {id:'purple',hex:'#7b61ff'}, {id:'teal',hex:'#00f5a0'} ],
-      items: [],
-      version: null,
-      obj: null,
-      texture: null
-    };
+    const state = { skinFile:null, skinURL:null, boxFile:null, baseZip:null, zip:null, colors:[{id:'blue',hex:'#00d1f3'},{id:'purple',hex:'#7b61ff'},{id:'teal',hex:'#00f5a0'}], items:[], version:null, obj:null, objGroup:null, initialQuat:null, interacting:false, restore:false };
 
-    // modal helpers
     function showModal(html){ modalContent.innerHTML = html; modalWrap.style.display='flex'; document.getElementById('app').classList.add('blurred'); }
     function closeModal(){ modalWrap.style.display='none'; modalContent.innerHTML=''; document.getElementById('app').classList.remove('blurred'); }
     modalWrap.addEventListener('click', e=>{ if(e.target===modalWrap) closeModal(); });
 
-    // load logo if present in same folder
-    (async ()=>{
-      try{ const r = await fetch('./popcraft_title.png'); if(r.ok){ const blob = await r.blob(); const url = URL.createObjectURL(blob); logo.style.backgroundImage = `url(${url})`; } }catch(e){}
-    })();
+    // load logo if present
+    (async ()=>{ try{ const r = await fetch('./popcraft_title.png'); if(r.ok){ const b = await r.blob(); logo.style.backgroundImage = `url(${URL.createObjectURL(b)})`; } }catch(e){} })();
 
-    // three.js scene setup
-    let scene, camera, renderer, objGroup;
+    // three.js setup
+    let scene, camera, renderer, controls;
     function initThree(){
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(35, 320/420, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(40, 320/420, 0.1, 1000);
       camera.position.set(0,1.5,3);
       renderer = new THREE.WebGLRenderer({antialias:true,alpha:true});
-      renderer.setSize(320,420);
-      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(320,420); renderer.setPixelRatio(window.devicePixelRatio || 1);
       viewer.innerHTML=''; viewer.appendChild(renderer.domElement);
-      const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8); scene.add(hemi);
-      const dir = new THREE.DirectionalLight(0xffffff, 0.8); dir.position.set(5,10,7); scene.add(dir);
-      objGroup = new THREE.Group(); scene.add(objGroup);
-
-      // ground subtle
-      const ground = new THREE.Mesh(new THREE.PlaneGeometry(10,10), new THREE.MeshStandardMaterial({color:0x050505})); ground.rotation.x = -Math.PI/2; ground.position.y = -1.2; scene.add(ground);
-
+      const hemi = new THREE.HemisphereLight(0xffffff,0x444444,0.9); scene.add(hemi);
+      const dir = new THREE.DirectionalLight(0xffffff,1); dir.position.set(5,10,7); scene.add(dir);
+      state.objGroup = new THREE.Group(); scene.add(state.objGroup);
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(10,10), new THREE.MeshStandardMaterial({color:0x050505})); ground.rotation.x=-Math.PI/2; ground.position.y=-1.2; ground.receiveShadow=true; scene.add(ground);
+      // orbit controls for drag rotate
+      controls = new OrbitControls(camera, renderer.domElement); controls.enablePan=false; controls.enableZoom=false; controls.enableDamping=true; controls.dampingFactor=0.08; controls.autoRotate=true; controls.autoRotateSpeed=0.5; controls.minPolarAngle=0; controls.maxPolarAngle=Math.PI; controls.rotateSpeed=0.6;
+      // when user interacts, suspend auto-rotate and allow rotation; on end, restore automatically
+      controls.addEventListener('start', ()=>{ state.interacting=true; controls.autoRotate=false; state.restore=false; });
+      controls.addEventListener('end', ()=>{ state.interacting=false; state.restore=true; });
       animate();
     }
 
-    function animate(){ requestAnimationFrame(animate); if(objGroup) objGroup.rotation.y += 0.007; renderer.render(scene,camera); }
+    function animate(){ requestAnimationFrame(animate); if(state.restore && state.initialQuat && state.objGroup){ // slerp back to initial
+        state.objGroup.quaternion.slerp(state.initialQuat, 0.12); const diff = 1 - state.objGroup.quaternion.dot(state.initialQuat); if(diff < 0.001) state.restore=false; }
+      controls.update(); renderer.render(scene,camera); }
 
-    // load OBJ model from same folder
     async function loadObj(){
       try{
-        const loader = new OBJLoader();
-        const res = await fetch('./pop.obj');
-        if(!res.ok) { viewer.innerHTML = '<div class="muted">Aucun modèle pop.obj trouvé</div>'; return; }
-        const text = await res.text();
-        const object = loader.parse(text);
-        // apply simple material and texture if available
-        const texUrl = './box_template_blank.png';
-        let tex = null;
-        try{ const r = await fetch(texUrl); if(r.ok){ const blob = await r.blob(); tex = new THREE.TextureLoader().load(URL.createObjectURL(blob)); }}catch(e){}
-        object.traverse((child)=>{
-          if(child.isMesh){ child.material = new THREE.MeshStandardMaterial({map: tex || null}); child.castShadow=true; child.receiveShadow=true; }
-        });
+        const res = await fetch('./pop.obj'); if(!res.ok){ viewer.innerHTML='<div class="muted">Aucun modèle pop.obj trouvé à la racine</div>'; return; }
+        const txt = await res.text(); const loader = new OBJLoader(); const obj = loader.parse(txt);
+        // try load box texture
+        let tex = null; try{ const r2 = await fetch('./box_template_blank.png'); if(r2.ok){ const blob = await r2.blob(); tex = new THREE.TextureLoader().load(URL.createObjectURL(blob)); }}catch(e){ console.warn('box texture missing',e); }
+        obj.traverse(c=>{ if(c.isMesh){ c.material = new THREE.MeshStandardMaterial({map:tex || null}); c.castShadow=true; c.receiveShadow=true; } });
         // center
-        const box = new THREE.Box3().setFromObject(object);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        object.position.x += (object.position.x - center.x);
-        object.position.y += (object.position.y - center.y);
-        object.position.z += (object.position.z - center.z);
-
-        // clear old
-        objGroup.clear(); objGroup.add(object);
-        state.obj = object;
-      }catch(e){ console.error('obj load',e); viewer.innerHTML = '<div class="muted">Erreur chargement OBJ</div>'; }
+        const box = new THREE.Box3().setFromObject(obj); const center = box.getCenter(new THREE.Vector3()); obj.position.sub(center);
+        // scale to fit
+        const size = box.getSize(new THREE.Vector3()); const max = Math.max(size.x,size.y,size.z); if(max>2){ const s = 1.8 / max; obj.scale.setScalar(s); }
+        state.objGroup.clear(); state.objGroup.add(obj); state.obj = obj; state.initialQuat = state.objGroup.quaternion.clone(); state.restore=false; }
+      catch(e){ console.error('loadObj',e); viewer.innerHTML='<div class="muted">Erreur lors du chargement du modèle</div>'; }
     }
 
     initThree(); loadObj();
 
-    // skin handling
-    chooseSkin.addEventListener('click', ()=> skinFileInput.click());
-    skinFileInput.addEventListener('change', async e=>{ const f = e.target.files[0]; if(!f) return; await setSkinFromFile(f); });
-    async function setSkinFromFile(file){ state.skinFile = file; state.skinURL = URL.createObjectURL(file); applySkinTexture(state.skinURL); renderPreviewInfo(); }
-    clearSkinBtn.addEventListener('click', ()=>{ state.skinFile=null; state.skinURL=null; applySkinTexture(null); renderPreviewInfo(); });
+    // apply skin texture to meshes (maps applied to mesh materials if present)
+    async function applySkin(url){ if(!state.obj) return; try{ const tex = await new THREE.TextureLoader().loadAsync(url); state.obj.traverse(c=>{ if(c.isMesh){ c.material.map = tex; c.material.needsUpdate=true; } }); }catch(e){ console.warn('applySkin',e); } }
 
-    async function applySkinTexture(url){ if(!state.obj) return; // apply to all meshes
-      const texture = url ? await new THREE.TextureLoader().loadAsync(url) : null;
-      state.obj.traverse(child=>{ if(child.isMesh){ child.material.map = texture; child.material.needsUpdate = true; }});
-    }
+    // skin input handling (mobile-friendly)
+    chooseSkinBtn.addEventListener('click', ()=> skinFileInput.click());
+    skinFileInput.addEventListener('change', async e=>{ const f = e.target.files[0]; if(!f) return; state.skinFile = f; state.skinURL = URL.createObjectURL(f); await applySkin(state.skinURL); previewName.textContent = popNameEl.value || '—'; });
 
-    // fetch skin by username (Mojang -> sessionserver -> crafatar fallback)
+    // drag & drop support for viewer area
+    viewer.addEventListener('dragover', e=>{ e.preventDefault(); viewer.style.outline='3px dashed rgba(255,255,255,0.06)'; });
+    viewer.addEventListener('dragleave', e=>{ viewer.style.outline='none'; });
+    viewer.addEventListener('drop', async e=>{ e.preventDefault(); viewer.style.outline='none'; const f = e.dataTransfer.files && e.dataTransfer.files[0]; if(f && f.type.includes('png')){ state.skinFile=f; state.skinURL=URL.createObjectURL(f); await applySkin(state.skinURL); } });
+
+    // fetch skin via Mojang -> crafatar fallback
     fetchSkinBtn.addEventListener('click', async ()=>{
-      const name = username.value.trim(); if(!name) return showModal('<p>Rentre un pseudo Minecraft.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+      const name = usernameEl.value.trim(); if(!name) return showModal('<p>Rentre un pseudo Minecraft.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
       showModal('<p>Recherche du skin…</p>');
       try{
-        const blob = await fetchSkinByName(name);
-        closeModal();
-        if(!blob) return showModal('<p>Impossible de récupérer le skin.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
-        const file = new File([blob],'skin.png',{type:blob.type}); await setSkinFromFile(file);
+        const mo = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
+        if(mo.ok){ const moJson = await mo.json(); const uuid = moJson.id; const skinRes = await fetch(`https://crafatar.com/skins/${uuid}`); if(skinRes.ok){ const blob = await skinRes.blob(); const url = URL.createObjectURL(blob); state.skinURL = url; await applySkin(url); closeModal(); return; } }
+        // fallback
+        const fallback = await fetch(`https://crafatar.com/skins/${encodeURIComponent(name)}`); if(fallback.ok){ const blob = await fallback.blob(); const url = URL.createObjectURL(blob); state.skinURL = url; await applySkin(url); closeModal(); return; }
+        closeModal(); showModal('<p>Impossible de récupérer le skin.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
       }catch(e){ closeModal(); showModal('<p>Erreur réseau.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>'); }
     });
 
-    async function fetchSkinByName(name){
-      try{
-        const mo = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
-        if(mo.ok){ const moJson = await mo.json(); const uuid = moJson.id;
-          // crafatar supports uuid
-          const cr = await fetch(`https://crafatar.com/skins/${uuid}`);
-          if(cr.ok) return await cr.blob();
-        }
-      }catch(e){ console.warn('mojang fail',e); }
-      // fallback try crafatar with name (some setups)
-      try{ const cr2 = await fetch(`https://crafatar.com/skins/${encodeURIComponent(name)}`); if(cr2.ok) return await cr2.blob(); }catch(e){}
-      return null;
-    }
-
     // colors UI
-    function renderColors(){ colorsList.innerHTML=''; state.colors.forEach(c=>{ const d = document.createElement('div'); d.className='swatch'; d.style.background = c.hex; d.title = c.hex; d.dataset.id = c.id; d.addEventListener('click', ()=>{ selectColor(c.id); }); colorsList.appendChild(d); }); }
-    function selectColor(id){ state.colors.forEach(c=>c.selected=false); const c = state.colors.find(x=>x.id===id); if(c) c.selected=true; // set viewer bg
-      viewer.style.background = `linear-gradient(180deg, ${c.hex}, #070707)`; }
-    addColorBtn.addEventListener('click', ()=>{
-      showModal(`<h3>Importer une texture de boîte</h3><p>Uploader une texture PNG pour la boîte (sera utilisée comme box_texture.png).</p><div style="text-align:right;margin-top:12px"><input id="uBox" type="file" accept="image/png"><button onclick="(function(){ const f=document.getElementById('uBox').files[0]; if(f){ state.boxFile=f; closeModal(); showModal('<p>Texture importée en mémoire. Utilise Add new pop pour l\'appliquer.</p><div style="text-align:right"><button onclick=\"closeModal()\">OK</button></div>'); } else { alert('Aucun fichier'); } })()">Importer</button></div>`);
-    });
+    function renderColors(){ colorsList.innerHTML=''; state.colors.forEach(c=>{ const el=document.createElement('div'); el.className='swatch'; el.style.background=c.hex; el.dataset.id=c.id; el.addEventListener('click', ()=>{ selectColor(c.id); }); colorsList.appendChild(el); }); }
+    function selectColor(id){ state.colors.forEach(c=>c.selected=false); const c = state.colors.find(x=>x.id===id); if(c) c.selected=true; viewer.style.background=`linear-gradient(180deg, ${c.hex}, #070707)`; }
+    addColorBtn.addEventListener('click', ()=>{ showModal('<h3>Importer box texture</h3><p>Choisis une image PNG qui sera utilisée comme box_texture.png pour la pop.</p><div style="text-align:right;margin-top:8px"><input id="uBox" type="file" accept="image/png"><button onclick="(function(){ const f=document.getElementById(\'uBox\').files[0]; if(f){ state.boxFile=f; closeModal(); showModal(\'<p>Texture importée en mémoire. Clique Add new pop pour l\'ajouter au pack.</p><div style=\"text-align:right\"><button onclick=\\"closeModal()\\">OK</button></div>\'); } else alert(\'Aucun fichier sélectionné\'); })()">Importer</button></div>'); });
+    exportTemplatesBtn.addEventListener('click', ()=>{ fetch('./box_template_blank.png').then(r=>r.ok? r.blob() : Promise.reject()).then(b=>saveAs(b,'box_template_blank.png')).catch(()=>{ showModal('<p>Template introuvable à la racine.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>'); }); });
 
-    exportTemplatesBtn.addEventListener('click', ()=>{
-      // download the blank template that is present in repo
-      fetch('./box_template_blank.png').then(r=>{ if(r.ok) return r.blob(); else throw 0 }).then(b=>{ saveAs(b,'box_template_blank.png'); }).catch(()=>{ // fallback small placeholder
-        const blob = new Blob([new Uint8Array([0])],{type:'image/png'}); saveAs(blob,'box_template_blank.png'); });
-    });
-
-    // versions & items fetch
-    async function fetchVersions(){
-      try{
-        const res = await fetch('https://api.github.com/repos/PrismarineJS/minecraft-data/contents/data/pc');
-        if(res.ok){ const data = await res.json(); const vers = data.filter(d=>d.type==='dir').map(d=>d.name).filter(n=>/^[0-9]/.test(n)); vers.sort((a,b)=>compareVer(b,a)); populateVersions(vers); return; }
-      }catch(e){ console.warn('gh api',e); }
-      populateVersions(['1.21','1.20.6','1.20.4','1.20.1']);
-    }
+    // fetch versions/items (PrismarineJS) with fallback
+    async function fetchVersions(){ try{ const res = await fetch('https://api.github.com/repos/PrismarineJS/minecraft-data/contents/data/pc'); if(res.ok){ const data = await res.json(); const vers = data.filter(d=>d.type==='dir').map(d=>d.name).filter(n=>/^[0-9]/.test(n)); vers.sort((a,b)=>compareVer(b,a)); populateVersions(vers); return; } }catch(e){ console.warn('gh api fail',e); } populateVersions(['1.21','1.20.6','1.20.4','1.20.1']); }
     function compareVer(a,b){ const pa=a.split('.').map(n=>parseInt(n)); const pb=b.split('.').map(n=>parseInt(n)); for(let i=0;i<Math.max(pa.length,pb.length);i++){ const na=pa[i]||0; const nb=pb[i]||0; if(na!==nb) return na-nb; } return 0; }
-    function populateVersions(list){ versionSelect.innerHTML=''; list.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.textContent=v; versionSelect.appendChild(o); }); state.version = list[0]; fetchItems(state.version); }
-
-    async function fetchItems(ver){ itemSelect.innerHTML = '<option>Chargement…</option>';
-      const urls = [
-        `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/${ver}/items.json`,
-        `https://cdn.jsdelivr.net/gh/PrismarineJS/minecraft-data@master/data/pc/${ver}/items.json`
-      ];
-      for(const u of urls){ try{ const r = await fetch(u); if(!r.ok) continue; const arr = await r.json(); const names = arr.map(i=>i.name).sort(); itemSelect.innerHTML=''; names.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; itemSelect.appendChild(o); }); state.items = names; return; }catch(e){ console.warn('items fetch',e); } }
-      itemSelect.innerHTML = '<option>Erreur chargement</option>';
-    }
-
+    function populateVersions(list){ versionSelect.innerHTML=''; const seen=new Set(); list.forEach(v=>{ if(seen.has(v)) return; seen.add(v); const o=document.createElement('option'); o.value=v; o.textContent=v; versionSelect.appendChild(o); }); state.version = versionSelect.value || list[0]; fetchItems(state.version); }
+    async function fetchItems(ver){ itemSelect.innerHTML='<option>Chargement…</option>'; const urls = [`https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/${ver}/items.json`,`https://cdn.jsdelivr.net/gh/PrismarineJS/minecraft-data@master/data/pc/${ver}/items.json`]; for(const u of urls){ try{ const r = await fetch(u); if(!r.ok) continue; const arr = await r.json(); const names = arr.map(i=>i.name).sort(); itemSelect.innerHTML=''; names.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; itemSelect.appendChild(o); }); state.items = names; return; }catch(e){ console.warn('items fetch fail',e); } } itemSelect.innerHTML='<option>Erreur chargement</option>'; }
     versionSelect.addEventListener('change', ()=>{ state.version = versionSelect.value; fetchItems(state.version); });
     fetchVersions();
 
-    // base pack
-    basePackInput.addEventListener('change', async e=>{
-      const f = e.target.files[0]; if(!f) return; baseName.textContent = f.name; state.baseZip = f; state.zip = await JSZip.loadAsync(f);
-      // if zip contains popcraft_title.png or box template, show them
-      for(const k of Object.keys(state.zip.files)){
-        if(k.toLowerCase().endsWith('popcraft_title.png')){ const b = await state.zip.file(k).async('blob'); logo.style.backgroundImage = `url(${URL.createObjectURL(b)})`; }
-      }
-      showModal('<p>Pack de base chargé.</p><div style="text-align:right;margin-top:12px"><button onclick="closeModal()">OK</button></div>');
-    });
+    // base pack handling (mobile friendly)
+    const choosePackBtnEl = document.getElementById('choosePack'); choosePackBtnEl.addEventListener('click', ()=> basePackInput.click());
+    basePackInput.addEventListener('change', async e=>{ const f = e.target.files[0]; if(!f) return; baseName.textContent = f.name; state.baseZip = f; state.zip = await JSZip.loadAsync(f); // detect popcraft_title.png or template
+      for(const k of Object.keys(state.zip.files)){ if(k.toLowerCase().endsWith('popcraft_title.png')){ const b = await state.zip.file(k).async('blob'); logo.style.backgroundImage = `url(${URL.createObjectURL(b)})`; } if(k.toLowerCase().endsWith('box_template_blank.png')){ const b = await state.zip.file(k).async('blob'); state.boxFile = new File([b],'box_template_blank.png',{type:'image/png'}); } }
+      showModal('<p>Pack de base chargé.</p><div style="text-align:right;margin-top:12px"><button onclick="closeModal()">OK</button></div>'); });
 
-    // check name exists
-    popName.addEventListener('input', async ()=>{ const name = popName.value.trim(); if(!name){ popName.style.borderColor=''; return; } if(await nameExists(name)){ popName.style.borderColor = 'red'; } else popName.style.borderColor=''; previewName.textContent = name || '—'; });
+    // check name exists in zip
+    popNameEl.addEventListener('input', async ()=>{ const name = popNameEl.value.trim(); if(!name){ popNameEl.style.borderColor=''; previewName.textContent='—'; return; } if(await nameExists(name)){ popNameEl.style.borderColor='red'; } else popNameEl.style.borderColor=''; previewName.textContent = name; });
     async function nameExists(name){ if(!state.zip) return false; for(const k of Object.keys(state.zip.files)){ if(k.endsWith('.json')){ const txt = await state.zip.file(k).async('string'); if(txt.includes(name)) return true; } } return false; }
 
-    // add pop into zip (in memory)
+    // add pop into zip
     addPopBtn.addEventListener('click', async ()=>{
-      const name = popName.value.trim(); if(!name) return showModal('<p>Choisis un nom pour la pop.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
+      const name = popNameEl.value.trim(); if(!name) return showModal('<p>Choisis un nom pour la pop.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
       if(await nameExists(name)) return showModal('<p>Nom déjà présent dans le pack.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
       if(!state.zip) return showModal('<p>Charge d\'abord un pack de base (.zip)</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
-
       const texFolder = `assets/minecraft/textures/item/${name}/`;
-      if(state.skinFile) state.zip.file(texFolder + 'skin.png', state.skinFile);
-      if(state.boxFile) state.zip.file(texFolder + 'box_texture.png', state.boxFile);
-
-      // model
-      if(state.templateModelContent){ const model = state.templateModelContent.replace(/nompop/g,name).replace(/pop4/g,name); state.zip.file(`assets/minecraft/models/block/pop/${name}.json`, model); }
+      if(state.skinFile) state.zip.file(texFolder+'skin.png', state.skinFile);
+      if(state.boxFile) state.zip.file(texFolder+'box_texture.png', state.boxFile);
+      // model template detection
+      let template=null; for(const k of Object.keys(state.zip.files)){ if(k.includes('assets/minecraft/models/block/pop/') && k.toLowerCase().includes('nompop')){ template = await state.zip.file(k).async('string'); break; } }
+      if(template){ const newModel = template.replace(/nompop/g,name).replace(/pop4/g,name); state.zip.file(`assets/minecraft/models/block/pop/${name}.json`, newModel); }
       else { const minimal = JSON.stringify({"1":`item/${name}/skin","2":`item/${name}/box_texture`},null,2); state.zip.file(`assets/minecraft/models/block/pop/${name}.json`, minimal); }
-
       // edit item json
       const itemKey = `assets/minecraft/items/${itemSelect.value.replace(':','_')}.json`;
       let arr = [];
-      if(state.zip.file(itemKey)){
-        try{ const txt = await state.zip.file(itemKey).async('string'); arr = JSON.parse(txt); if(!Array.isArray(arr)) arr = arr.items || []; }catch(e){ arr = []; }
-      }
-      arr.push({ when:[name,name.toLowerCase(),`ipattern:${name}`,`iregex:.${name}.`], model:{ type:'minecraft:model', model:`minecraft:block/pop/${name}` } });
-      state.zip.file(itemKey, JSON.stringify(arr,null,2));
-
-      showModal(`<p>Pop ${name} ajoutée en mémoire.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>`);
+      if(state.zip.file(itemKey)){ try{ const txt = await state.zip.file(itemKey).async('string'); arr = JSON.parse(txt); if(!Array.isArray(arr)) arr = arr.items || []; }catch(e){ arr = []; } }
+      arr.push({ when:[name,name.toLowerCase(),`ipattern:${name}`,`iregex:.${name}.`], model:{ type:'minecraft:model', model:`minecraft:block/pop/${name}` } }); state.zip.file(itemKey, JSON.stringify(arr,null,2));
+      showModal(`<p>Pop ${name} ajoutée en mémoire. Clique Générer pour télécharger le pack.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>`);
     });
 
-    // generate & download
+    // generate pack
     generateBtn.addEventListener('click', async ()=>{
       if(!state.zip) return showModal('<p>Charge un pack de base.</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>');
-      // check placeholders
-      const leftovers = [];
-      for(const k of Object.keys(state.zip.files)){ if(k.endsWith('.json')){ const txt = await state.zip.file(k).async('string'); if(txt.includes('<nompop>') || txt.includes('nompop')) leftovers.push(k); } }
+      const leftovers=[]; for(const k of Object.keys(state.zip.files)){ if(k.endsWith('.json')){ const txt = await state.zip.file(k).async('string'); if(txt.includes('<nompop>') || txt.includes('nompop')) leftovers.push(k); } }
       if(leftovers.length) return showModal(`<p>Des placeholders restent :<br>${leftovers.slice(0,20).join('<br>')}</p><div style="text-align:right"><button onclick="closeModal()">OK</button></div>`);
-      // item existence check
-      if(state.items && !state.items.includes(itemSelect.value)){
-        const ok = confirm('L\'item sélectionné n\'existe pas pour la version '+state.version+'. Continuer ?'); if(!ok) return;
-      }
-      const blob = await state.zip.generateAsync({type:'blob'});
-      saveAs(blob,'PopCraft_custom.zip');
+      if(state.items && !state.items.includes(itemSelect.value)){ const ok = confirm('L\'item sélectionné n\'existe pas pour la version '+state.version+'. Continuer ?'); if(!ok) return; }
+      const blob = await state.zip.generateAsync({type:'blob'}); saveAs(blob,'PopCraft_custom.zip');
     });
 
-    // preview info update
+    // preview item update
     itemSelect.addEventListener('change', ()=> previewItem.textContent = itemSelect.value || '—');
 
-    // init
+    // initial render colors
+    function renderColors(){ colorsList.innerHTML=''; state.colors.forEach(c=>{ const d=document.createElement('div'); d.className='swatch'; d.style.background=c.hex; d.dataset.id=c.id; d.addEventListener('click', ()=>{ state.colors.forEach(x=>x.selected=false); c.selected=true; renderColors(); viewer.style.background=`linear-gradient(180deg, ${c.hex}, #070707)`; }); colorsList.appendChild(d); }); }
     renderColors();
 
+    // utils
+    function base64ToBlob(b64, type){ const bin = atob(b64); const len = bin.length; const arr = new Uint8Array(len); for(let i=0;i<len;i++) arr[i]=bin.charCodeAt(i); return new Blob([arr],{type}); }
+
+    // initialize
+    window.addEventListener('resize', ()=>{ if(renderer) renderer.setSize(320,420); });
   </script>  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script></body>
 </html>
