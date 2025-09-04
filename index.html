@@ -44,7 +44,7 @@
     <div style="margin-bottom:6px">Meshes détectés :</div>
     <select id="meshSelect"></select>
     <button id="applyTexBtn">Appliquer texture</button>
-    <div style="margin-top:6px;font-size:12px;color:#bfc9cf">Si aucun nom \"box\" trouvé, choisis le mesh correspondant à la boîte.</div>
+    <div style="margin-top:6px;font-size:12px;color:#bfc9cf">Si aucun nom \"box_" trouvé, choisis le mesh correspondant à la boîte.</div>
   </div>
 
   <div class="hint">Clique / glisse pour tourner — relâchement remet rotation auto</div>
@@ -159,7 +159,7 @@
         let candidateIndex = -1;
         for(let i=0;i<meshList.length;i++){
           const n = meshList[i].name.toLowerCase();
-          if(n.includes('box') || n.includes('pack') || n.includes('case') || n.includes('boite')) { candidateIndex = i; break; }
+          if(n.includes('box_') || n.includes('pack') || n.includes('case') || n.includes('boite')) { candidateIndex = i; break; }
         }
         if(candidateIndex >= 0) {
           meshSelect.selectedIndex = candidateIndex;
