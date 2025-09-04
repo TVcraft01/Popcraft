@@ -3,25 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PopCraft — Viewer (fix transparence & upright)</title>
+  <title>PopCraft — Viewer</title>
   <style>
-    :root{ --bg:#0e0f12; --accent:#06c9d8; }
+    :root{ --bg:#0e0f12; --panel:#121418; --accent:#06c9d8; }
     *{ box-sizing:border-box; }
-    html,body{ margin:0; height:100%; background:#111; color:#e9eef1; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial; }
-    header{ height:100px; display:grid; place-items:center; background:linear-gradient(135deg, var(--accent) 50%, transparent 50%); }
-    header img{ height:80px; object-fit:contain; }
-    main{ display:flex; height:calc(100vh - 100px); gap:0; }
-    #viewer{ flex:1 1 0; background:#0b0c0e; min-width:320px; }
-    #sidebar{ width:340px; background:#141619; padding:14px; box-shadow:-6px 0 24px rgba(0,0,0,0.6); }
-    #status{ margin-bottom:12px; padding:8px 10px; border-radius:6px; background:rgba(0,0,0,.6); color:#aefaa0; font:13px/1.3 monospace }
-    label, button{ display:inline-block; margin:6px 4px 6px 0; cursor:pointer; padding:8px 10px; border-radius:8px; background:#06c9d8; color:#041414; border:none; font-weight:700 }
-    #username{ width:100%; padding:8px; margin:8px 0; border-radius:8px; border:none; }
-    .hint{ color:#9aa4ab; font-size:13px; margin-top:10px; background:rgba(0,0,0,0.14); padding:8px; border-radius:8px }
-    ul{ padding-left:16px; color:#c9d3d8; }
-    .small{ font-size:13px; color:#b9c2c7 }
+    html,body{ margin:0; height:100%; background:#111; color:#e9eef1; font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; }
+    header{ height:120px; display:grid; place-items:center; background:linear-gradient(135deg,var(--accent) 50%,transparent 50%); }
+    header img{ height:90px; object-fit:contain; }
+    #viewer{ width:100vw; height:calc(100vh - 120px); touch-action:none; display:flex; justify-content:flex-start; align-items:center; }
+    canvas{ display:block; }
+    #status{ position:fixed; top:10px; left:10px; padding:6px 10px; border-radius:6px; background:rgba(0,0,0,.7); color:#aefaa0; font:12px/1.2 monospace; z-index:10 }
+    .hint{ position:fixed; bottom:12px; left:12px; z-index:10; color:#9aa4ab; font-size:13px; background:rgba(0,0,0,0.35); padding:8px; border-radius:8px}
   </style>
 
-  <!-- es-module-shims pour compatibilité importmap -->
   <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.min.js"></script>
   <script type="importmap">
   {
@@ -36,66 +30,20 @@
   <header>
     <img src="popcraft_title.png" alt="PopCraft" onerror="this.style.display='none'">
   </header>
-
-  <main>
-    <div id="viewer"></div>
-
-    <aside id="sidebar">
-      <div id="status">⏳ Chargement…</div>
-
-      <div>
-        <label for="fileInput">📂 Uploader skin</label>
-        <input id="fileInput" type="file" accept="image/png" style="display:none">
-        <label id="fileLabel" style="background:#333;color:#fff;">Aucun</label>
-      </div>
-
-      <div style="margin-top:10px">
-        <input id="username" placeholder="Pseudo Minecraft" />
-        <button id="fetchSkin">🔍 Chercher</button>
-      </div>
-
-      <div style="margin-top:12px">
-        <button id="resetCam">⟲ Reset vue</button>
-        <button id="applyDetectedOverlay" title="Re-apply heuristic overlay">🔧 Re-détecter overlay</button>
-      </div>
-
-      <div class="hint" style="margin-top:14px">
-        Si la transparence masque la couche inférieure, clique sur <strong>Re-détecter overlay</strong> pour forcer la détection.
-      </div>
-
-      <div style="margin-top:12px">
-        <div class="small">Meshes détectés (fig_)</div>
-        <div id="meshListBox" style="max-height:220px; overflow:auto; margin-top:6px; background:rgba(255,255,255,0.02); padding:8px; border-radius:6px"></div>
-      </div>
-      <div style="margin-top:10px">
-        <div class="small">Notes :</div>
-        <ul>
-          <li>Prefixe <code>box_</code> → boîte</li>
-          <li>Prefixe <code>fig_</code> → figurine</li>
-          <li>Si overlay (chapeau) masque la base : coche le mesh correspondant comme « overlay » ci-dessous.</li>
-        </ul>
-      </div>
-    </aside>
-  </main>
+  <div id="viewer"></div>
+  <div id="status">⏳ Chargement…</div>
+  <div class="hint">Clique/glisse pour tourner — relâche pour auto-rotation</div>
 
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+    const status = document.getElementById('status');
     const viewer = document.getElementById('viewer');
-    const statusEl = document.getElementById('status');
-    const fileInput = document.getElementById('fileInput');
-    const fileLabel = document.getElementById('fileLabel');
-    const usernameEl = document.getElementById('username');
-    const fetchSkinBtn = document.getElementById('fetchSkin');
-    const meshListBox = document.getElementById('meshListBox');
-    const applyDetectedOverlayBtn = document.getElementById('applyDetectedOverlay');
-    const resetCamBtn = document.getElementById('resetCam');
+    let W = viewer.clientWidth, H = viewer.clientHeight;
 
-    // three basics
-    const W = Math.max(320, viewer.clientWidth);
-    const H = Math.max(240, viewer.clientHeight);
+    // --- Scène de base
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
     camera.position.set(0, 2, 6);
@@ -105,302 +53,103 @@
     renderer.setSize(W, H);
     viewer.appendChild(renderer.domElement);
 
-    // lights
-    scene.add(new THREE.AmbientLight(0xffffff, .85));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-    dir.position.set(4,6,6);
+    // Lumières
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dir = new THREE.DirectionalLight(0xffffff, 1);
+    dir.position.set(4, 6, 6);
     scene.add(dir);
 
-    // controls (camera orbit) — autoRotate integrated
+    // Contrôles
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.enablePan = false;
-    controls.enableZoom = false; // disable zoom
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 1.4;
+    controls.enableZoom = false; // désactive zoom
     controls.minPolarAngle = 0.35;
     controls.maxPolarAngle = Math.PI - 0.35;
 
-    // fallback cube (visible until model loads)
-    const cube = new THREE.Mesh(
-      new THREE.BoxGeometry(2,2,2),
-      new THREE.MeshStandardMaterial({ color: 0x00ff00 })
-    );
-    scene.add(cube);
-    statusEl.textContent = '✅ Cube affiché (en attente de pop.glb)…';
-
-    // modelGroup rotates around center
+    // Groupe racine
     const modelGroup = new THREE.Group();
     scene.add(modelGroup);
 
+    // Fallback cube
+    const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(2,2,2),
+      new THREE.MeshStandardMaterial({ color:0x00ff00 })
+    );
+    scene.add(cube);
+
+    // Loader
     const loader = new GLTFLoader();
     const url = 'pop.glb' + (location.hostname.includes('github.io') ? `?v=${Date.now()}` : '');
 
-    // store fig meshes info: {name, mesh, overlay:boolean}
-    const figurine = []; // array of {name, mesh, overlay}
-
-    // Heuristic overlay name test
-    function isLikelyOverlayName(name){
-      if(!name) return false;
-      const n = name.toLowerCase();
-      return (n.includes('overlay') || n.includes('hat') || n.includes('layer') || n.includes('cap') || n.includes('top') || n.match(/_1$|_02$|layer2|outer/));
-    }
-
-    // function to build UI list of fig_ meshes and allow toggling overlay
-    function buildMeshListUI(){
-      meshListBox.innerHTML = '';
-      if(figurine.length === 0){ meshListBox.innerHTML = '<div class="small">Aucun mesh fig_ détecté</div>'; return; }
-      figurine.forEach((f, i)=>{
-        const row = document.createElement('div');
-        row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.justifyContent = 'space-between';
-        const left = document.createElement('div'); left.textContent = f.name; left.style.fontSize='13px';
-        const cb = document.createElement('input'); cb.type='checkbox'; cb.checked = !!f.overlay;
-        cb.addEventListener('change', ()=>{
-          f.overlay = cb.checked;
-          applySkinAndLayers(currentSkinTexture); // reapply with new overlay flags
-        });
-        row.appendChild(left);
-        const wrap = document.createElement('div'); wrap.appendChild(cb);
-        row.appendChild(wrap);
-        meshListBox.appendChild(row);
-      });
-    }
-
-    let currentSkinTexture = null; // keep loaded texture
-
-    // load glb
     loader.load(url, (gltf)=>{
-      console.log('GLTF loaded', gltf);
-      statusEl.textContent = '✅ pop.glb chargé — préparation…';
       scene.remove(cube);
-
       const model = gltf.scene;
       modelGroup.add(model);
 
-      // compute scale & center
+      // Scale & center
       const bbox = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3(); bbox.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const desired = 3.2;
-      const scl = desired / maxDim;
-      model.scale.setScalar(scl);
-
-      // recalc center and shift model so modelGroup is centered
+      model.scale.setScalar(3.2 / maxDim);
       const bbox2 = new THREE.Box3().setFromObject(model);
       const center = new THREE.Vector3(); bbox2.getCenter(center);
       model.position.sub(center);
 
-      // traverse and collect fig_ meshes and apply box_ textures immediately
-      const texLoader = new THREE.TextureLoader();
-      let boxTextureLoaded = false;
-
-      texLoader.load('box_template_blank.png', (boxTex)=>{
-        boxTex.flipY = false;
-        boxTex.encoding = THREE.sRGBEncoding;
-        boxTex.magFilter = THREE.NearestFilter;
-        boxTex.minFilter = THREE.NearestFilter;
-        boxTex.generateMipmaps = false;
-
-        model.traverse((child)=>{
-          if(child.isMesh && child.name && child.name.startsWith('box_')){
-            child.material = new THREE.MeshStandardMaterial({ map: boxTex });
-          }
-        });
-        boxTextureLoaded = true;
-        console.log('Box texture applied');
-      }, undefined, ()=>{ console.warn('box_template_blank.png not found'); });
-
-      figurine.length = 0;
-      let idx = 0;
+      // Transparence propre : overlay au-dessus
       model.traverse((child)=>{
-        if(child.isMesh && child.name && child.name.startsWith('fig_')){
-          const name = child.name.trim() || `fig_${idx++}`;
-          figurine.push({ name, mesh: child, overlay: isLikelyOverlayName(name) });
+        if(child.isMesh && child.name){
+          if(child.name.startsWith('fig_2nd_layer_')){
+            child.material.transparent = true;
+            child.material.alphaTest = 0.05;
+            child.material.depthWrite = false;
+            child.renderOrder = 2000;
+          }
         }
       });
 
-      buildMeshListUI();
+      status.textContent = '✅ Modèle pop.glb chargé';
 
-      // Try default skin.png
-      texLoader.load('skin.png', (skinTex) => {
-        currentSkinTexture = skinTex;
-        applySkinAndLayers(skinTex);
-        statusEl.textContent = '✅ Modèle et skin par défaut appliqués';
-      }, undefined, ()=>{
-        statusEl.textContent = '⚠️ Modèle chargé — skin par défaut absent';
-      });
+      // Auto-rotation
+      let autoRotate = true;
+      controls.addEventListener('start', ()=> autoRotate=false);
+      controls.addEventListener('end', ()=> setTimeout(()=> autoRotate=true, 1200));
 
-      // controls interaction: disable autoRotate on user interaction, re-enable after
-      controls.addEventListener('start', ()=>{
-        controls.autoRotate = false;
-      });
-      controls.addEventListener('end', ()=>{
-        // if camera is under model too much, animate back to upright camera
-        setTimeout(()=> {
-          // compute spherical coords from target (controls.target defaults to origin)
-          const offset = camera.position.clone().sub(controls.target);
-          const sph = new THREE.Spherical(); sph.setFromVector3(offset);
-          const desiredPhi = Math.PI / 2; // horizontal
-          // if user looked too much under or over, animate to desiredPhi
-          if(Math.abs(sph.phi - desiredPhi) > 0.5){
-            animateCameraToPhi(desiredPhi, 500);
-          }
-          // re-enable autoRotate gently
-          setTimeout(()=> controls.autoRotate = true, 800);
-        }, 300);
-      });
+      const clock = new THREE.Clock();
+      let targetX = 0, targetZ = 0;
 
-    }, (ev)=>{
-      if(ev.total) statusEl.textContent = `⬇️ Chargement pop.glb ${(ev.loaded/ev.total*100).toFixed(0)}%`;
-    }, (err)=>{
+      function tick(){
+        requestAnimationFrame(tick);
+
+        // auto rotation Y
+        if(autoRotate) modelGroup.rotation.y += 0.4 * clock.getDelta();
+
+        // ramener en douceur X/Z
+        targetX *= 0.9; targetZ *= 0.9;
+        modelGroup.rotation.x *= 0.9;
+        modelGroup.rotation.z *= 0.9;
+
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      tick();
+    },
+    (ev)=>{
+      if(ev.total) status.textContent = `⬇️ Chargement pop.glb ${(ev.loaded/ev.total*100).toFixed(0)}%`;
+    },
+    (err)=>{
       console.error('Erreur glTF:', err);
-      statusEl.style.color = '#ff9b9b';
-      statusEl.textContent = '❌ Erreur: pop.glb manquant (placez-le à la racine)';
+      status.style.color = '#ff9b9b';
+      status.textContent = '❌ Erreur: pop.glb introuvable';
       (function loop(){ requestAnimationFrame(loop); cube.rotation.y += 0.01; controls.update(); renderer.render(scene, camera); })();
     });
 
-    // apply skin + layer handling
-    function applySkinAndLayers(texture){
-      if(!texture) return;
-      texture.flipY = false;
-      texture.encoding = THREE.sRGBEncoding;
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestFilter;
-      texture.generateMipmaps = false;
-
-      // apply base and overlay using overlay flag
-      figurine.forEach(item=>{
-        const mesh = item.mesh;
-        // clone geometry materials to avoid side effects
-        if(item.overlay){
-          // overlay material: render after base, don't write depth so base shows through
-          const mat = new THREE.MeshStandardMaterial({
-            map: texture,
-            transparent: true,
-            alphaTest: 0.05,
-            depthWrite: false,
-            side: THREE.DoubleSide
-          });
-          mesh.material = mat;
-          mesh.renderOrder = 2000;
-        } else {
-          const mat = new THREE.MeshStandardMaterial({
-            map: texture,
-            transparent: false,
-            alphaTest: 0.01,
-            depthWrite: true,
-            side: THREE.FrontSide
-          });
-          mesh.material = mat;
-          mesh.renderOrder = 10;
-        }
-      });
-      currentSkinTexture = texture;
-      console.log('Skin & layers applied (overlay flags respected)');
-    }
-
-    // animate camera phi to targetPhi (ms)
-    let camAnimRunning = false;
-    function animateCameraToPhi(targetPhi, duration = 500){
-      if(camAnimRunning) return;
-      camAnimRunning = true;
-      controls.enabled = false;
-      const start = performance.now();
-      const offset = camera.position.clone().sub(controls.target);
-      const sph = new THREE.Spherical(); sph.setFromVector3(offset);
-      const startPhi = sph.phi;
-      const startTheta = sph.theta;
-      const radius = sph.radius;
-      const targetTheta = startTheta; // keep same heading
-
-      function step(t){
-        const now = performance.now();
-        const p = Math.min(1, (now - start)/duration);
-        const ease = (p<0.5) ? (2*p*p) : (-1 + (4-2*p)*p); // simple ease
-        const phi = THREE.MathUtils.lerp(startPhi, targetPhi, ease);
-        const newS = new THREE.Spherical(radius, phi, targetTheta);
-        const newPos = new THREE.Vector3().setFromSpherical(newS).add(controls.target);
-        camera.position.copy(newPos);
-        camera.lookAt(controls.target);
-        if(p < 1){
-          requestAnimationFrame(step);
-        } else {
-          controls.enabled = true;
-          camAnimRunning = false;
-        }
-      }
-      requestAnimationFrame(step);
-    }
-
-    // UI: file upload handling
-    fileInput.addEventListener('change', (e)=>{
-      const f = e.target.files[0];
-      if(!f) return;
-      fileLabel.textContent = f.name;
-      const url = URL.createObjectURL(f);
-      const texLoader = new THREE.TextureLoader();
-      texLoader.load(url, (tex)=>{
-        applySkinAndLayers(tex);
-        statusEl.textContent = '✅ Skin upload appliqué';
-      }, undefined, (err)=> { console.error(err); statusEl.textContent = '❌ Erreur skin upload'; });
-    });
-
-    // label clickable to open file dialog
-    fileLabel.addEventListener('click', ()=> fileInput.click());
-    document.querySelector('label[for="fileInput"]').addEventListener('click', ()=> fileInput.click());
-
-    // fetch skin via Mojang -> crafatar
-    fetchSkinBtn.addEventListener('click', async ()=>{
-      const name = usernameEl.value.trim();
-      if(!name) { statusEl.textContent = '⚠️ Entre un pseudo'; return; }
-      statusEl.textContent = `🔎 Recherche ${name}…`;
-      try{
-        // Query Mojang for UUID
-        const res = await fetch('https://api.mojang.com/users/profiles/minecraft/' + encodeURIComponent(name));
-        if(!res.ok) throw new Error('user not found');
-        const j = await res.json();
-        const uuid = j.id;
-        const skinUrl = 'https://crafatar.com/skins/' + uuid;
-        const texLoader = new THREE.TextureLoader();
-        texLoader.load(skinUrl, (tex)=>{
-          applySkinAndLayers(tex);
-          statusEl.textContent = `✅ Skin de ${name} appliqué`;
-        }, undefined, ()=> { statusEl.textContent = '❌ Erreur chargement skin'; });
-      }catch(e){
-        console.warn(e);
-        statusEl.textContent = `❌ Pseudo introuvable`;
-      }
-    });
-
-    // button: re-detect overlay heuristics and reapply
-    applyDetectedOverlayBtn.addEventListener('click', ()=>{
-      figurine.forEach(item => { item.overlay = isLikelyOverlayName(item.name); });
-      buildMeshListUI();
-      if(currentSkinTexture) applySkinAndLayers(currentSkinTexture);
-      statusEl.textContent = '🔧 Overlay heuristique réappliquée';
-    });
-
-    // reset camera: go to default position smoothly
-    resetCamBtn.addEventListener('click', ()=> animateCameraToPhi(Math.PI/2, 400));
-
-    // initial render loop
-    function renderLoop(){
-      requestAnimationFrame(renderLoop);
-      controls.update();
-      // gentle upright of modelGroup rotation X/Z (if any) towards 0
-      modelGroup.rotation.x = THREE.MathUtils.lerp(modelGroup.rotation.x, 0, 0.08);
-      modelGroup.rotation.z = THREE.MathUtils.lerp(modelGroup.rotation.z, 0, 0.08);
-      renderer.render(scene, camera);
-    }
-    renderLoop();
-
-    // resize handling
+    // Resize
     window.addEventListener('resize', ()=>{
-      const w = Math.max(320, viewer.clientWidth), h = Math.max(240, viewer.clientHeight);
-      camera.aspect = w/h; camera.updateProjectionMatrix();
-      renderer.setSize(w,h);
+      W = viewer.clientWidth; H = viewer.clientHeight;
+      camera.aspect = W/H; camera.updateProjectionMatrix();
+      renderer.setSize(W, H);
     });
-
   </script>
 </body>
 </html>
