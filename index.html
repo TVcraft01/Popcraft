@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>PopCraft — Test OBJ direct</title>
+  <title>Test Cube + OrbitControls</title>
   <style>
     body { margin:0; overflow:hidden; background:#111; }
     #status {
@@ -18,7 +18,6 @@
   <script type="module">
     import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
     import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-    import { OBJLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/OBJLoader.js";
 
     const status = document.getElementById("status");
 
@@ -37,24 +36,11 @@
     const cube = new THREE.Mesh(geometry, material);
     scene.add(cube);
 
-    status.textContent = "✅ Cube affiché";
+    status.textContent = "✅ Cube affiché (avec OrbitControls)";
 
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
 
-    // Try load OBJ
-    const loader = new OBJLoader();
-    loader.load("pop.obj", (obj)=>{
-      scene.remove(cube);
-      obj.scale.set(1.5,1.5,1.5);
-      scene.add(obj);
-      status.textContent = "✅ pop.obj chargé";
-    }, undefined, (err)=>{
-      console.error("❌ Erreur pop.obj:", err);
-      status.textContent = "❌ Erreur: pop.obj introuvable";
-    });
-
-    // Animate
     function animate(){
       requestAnimationFrame(animate);
       cube.rotation.x += 0.01;
