@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PopCraft — Viewer (texture + centre)</title>
+  <title>PopCraft — Viewer</title>
   <style>
     :root{ --bg:#0e0f12; --panel:#121418; --accent:#06c9d8; }
     *{ box-sizing:border-box; }
     html,body{ margin:0; height:100%; background:#111; color:#e9eef1; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial; }
     header{ height:120px; display:grid; place-items:center; background:linear-gradient(135deg, var(--accent) 50%, transparent 50%); }
     header img{ height:90px; object-fit:contain; }
-    #viewer{ width:100vw; height:calc(100vh - 120px); touch-action:none; }
-    #status{ position:fixed; top:10px; left:10px; padding:6px 10px; border-radius:6px; background:rgba(0,0,0,.7); color:#aefaa0; font:12px/1.2 monospace; z-index:20 }
-    #meshUI{ position:fixed; top:10px; right:10px; z-index:20; background:rgba(0,0,0,0.6); padding:8px; border-radius:8px; color:#fff; font-family:monospace; font-size:13px }
-    #meshUI select{ max-width:260px }
-    #meshUI button{ margin-left:6px; }
+    #viewer{ width:100vw; height:calc(100vh - 160px); touch-action:none; }
+    #status{ position:fixed; top:10px; left:10px; padding:6px 10px; border-radius:6px; background:rgba(0,0,0,.7); color:#aefaa0; font:12px/1.2 monospace; z-index:10 }
     .hint{ position:fixed; bottom:12px; left:12px; z-index:10; color:#9aa4ab; font-size:13px; background:rgba(0,0,0,0.35); padding:8px; border-radius:8px}
+    #skinUpload{ position:fixed; top:10px; right:10px; z-index:20; background:rgba(0,0,0,0.6); padding:6px 10px; border-radius:8px; }
+    #skinUpload input{ display:none; }
+    #skinUpload label{ cursor:pointer; color:#fff; font-size:13px; }
   </style>
-
-  <!-- Polyfill import maps for older/phone browsers -->
+  
+  <!-- Polyfill import maps pour compatibilité téléphone -->
   <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.min.js"></script>
-
-  <!-- Import map: remap bare specifiers to CDN URLs (works on GitHub Pages) -->
+  
+  <!-- Import map (CDN three.js modules) -->
   <script type="importmap">
   {
     "imports": {
@@ -38,16 +38,11 @@
 
   <div id="viewer"></div>
   <div id="status">⏳ Chargement…</div>
-
-  <!-- Mesh selector UI -->
-  <div id="meshUI" style="display:none">
-    <div style="margin-bottom:6px">Meshes détectés :</div>
-    <select id="meshSelect"></select>
-    <button id="applyTexBtn">Appliquer texture</button>
-    <div style="margin-top:6px;font-size:12px;color:#bfc9cf">Si aucun nom \"box_" trouvé, choisis le mesh correspondant à la boîte.</div>
+  <div id="skinUpload">
+    <label for="fileInput">📂 Uploader un skin</label>
+    <input type="file" id="fileInput" accept="image/png">
   </div>
-
-  <div class="hint">Clique / glisse pour tourner — relâchement remet rotation auto</div>
+  <div class="hint">Clique / glisse pour tourner — relâchement remet la rotation auto</div>
 
   <script type="module">
     import * as THREE from 'three';
@@ -56,15 +51,12 @@
 
     const status = document.getElementById('status');
     const viewer = document.getElementById('viewer');
-    const meshUI = document.getElementById('meshUI');
-    const meshSelect = document.getElementById('meshSelect');
-    const applyTexBtn = document.getElementById('applyTexBtn');
+    const fileInput = document.getElementById('fileInput');
 
-    // sizes
-    let W = Math.max(320, viewer.clientWidth);
-    let H = Math.max(240, viewer.clientHeight);
+    let figurineMeshes = []; // pour appliquer skin
 
-    // scene, camera, renderer
+    // scène, caméra, rendu
+    let W = viewer.clientWidth, H = viewer.clientHeight;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
     camera.position.set(0, 2, 6);
@@ -74,189 +66,129 @@
     renderer.setSize(W, H);
     viewer.appendChild(renderer.domElement);
 
-    // lights
+    // lumières
     scene.add(new THREE.AmbientLight(0xffffff, .8));
     const dir = new THREE.DirectionalLight(0xffffff, 1);
     dir.position.set(4,6,6);
     scene.add(dir);
 
-    // controls
+    // contrôles
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.enablePan = false;
-    controls.minDistance = 2.5; controls.maxDistance = 12;
-    controls.minPolarAngle = 0.35; controls.maxPolarAngle = Math.PI - 0.35;
+    controls.minDistance = 2.5;
+    controls.maxDistance = 12;
+    controls.minPolarAngle = 0.35;
+    controls.maxPolarAngle = Math.PI - 0.35;
 
-    // fallback cube
+    // cube vert de secours
     const cube = new THREE.Mesh(
       new THREE.BoxGeometry(2,2,2),
       new THREE.MeshStandardMaterial({ color:0x00ff00 })
     );
     scene.add(cube);
-    status.textContent = '✅ Cube affiché (en attente pop.glb)…';
-    console.log('INIT: viewer ready');
+    status.textContent = '✅ Cube affiché (en attente de pop.glb)…';
 
-    // model group - we rotate this group to spin the model around its center
+    // group pour rotation centrée
     const modelGroup = new THREE.Group();
     scene.add(modelGroup);
 
-    // loader & url (cache-busting on github pages)
+    // chargeur GLTF
     const loader = new GLTFLoader();
     const url = 'pop.glb' + (location.hostname.includes('github.io') ? `?v=${Date.now()}` : '');
 
-    // storage for mesh refs
-    const meshList = [];
-
-    // load model
     loader.load(url, (gltf) => {
-      console.log('GLTF loaded', gltf);
-      status.textContent = '✅ pop.glb chargé (préparation)…';
+      scene.remove(cube);
 
-      // add model to group
       const model = gltf.scene;
       modelGroup.add(model);
 
-      // compute scale to fit
+      // mise à l’échelle + centrage
       const bbox = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3(); bbox.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const desired = 3.2; // desired max size
-      const scale = desired / maxDim;
-      model.scale.setScalar(scale);
+      model.scale.setScalar(3.2 / maxDim);
 
-      // recalc bbox after scaling
       const bbox2 = new THREE.Box3().setFromObject(model);
       const center = new THREE.Vector3(); bbox2.getCenter(center);
-
-      // move model so its center is at the origin of modelGroup
       model.position.sub(center);
 
-      // OPTIONAL: raise model slightly so it sits nicely (if needed)
-      // modelGroup.position.y = 0; // keep at origin so it rotates around center
+      const texLoader = new THREE.TextureLoader();
 
-      // build mesh list (names + references)
-      meshList.length = 0;
-      let idx = 0;
-      model.traverse((child)=>{
-        if(child.isMesh){
-          const meshName = child.name && child.name.trim() ? child.name : `mesh_${idx++}`;
-          meshList.push({ name: meshName, mesh: child });
-          console.log('Mesh found:', meshName, child);
-        }
-      });
-
-      // populate selector UI
-      if(meshList.length){
-        meshSelect.innerHTML = '';
-        meshList.forEach((m, i)=>{
-          const opt = document.createElement('option');
-          opt.value = i;
-          opt.textContent = m.name;
-          meshSelect.appendChild(opt);
-        });
-
-        // auto-select candidate mesh(s) containing 'box' / 'pack' / 'case'
-        let candidateIndex = -1;
-        for(let i=0;i<meshList.length;i++){
-          const n = meshList[i].name.toLowerCase();
-          if(n.includes('box_') || n.includes('pack') || n.includes('case') || n.includes('boite')) { candidateIndex = i; break; }
-        }
-        if(candidateIndex >= 0) {
-          meshSelect.selectedIndex = candidateIndex;
-          status.textContent = '✅ Modèle chargé — boîte détectée automatiquement (' + meshList[candidateIndex].name + ')';
-        } else {
-          status.textContent = '⚠️ Modèle chargé — choisis le mesh qui correspond à la boîte';
-        }
-        meshUI.style.display = 'block';
-      } else {
-        status.textContent = '⚠️ Modèle chargé — aucun mesh trouvé (ou noms vides)';
-      }
-
-      // animate modelGroup (auto-rotate logic)
-      let autoRotate = true;
-      controls.addEventListener('start', ()=> autoRotate = false);
-      controls.addEventListener('end', ()=> setTimeout(()=> autoRotate = true, 1200));
-      const clock = new THREE.Clock();
-      (function tick(){ requestAnimationFrame(tick); if(autoRotate) modelGroup.rotation.y += 0.4 * clock.getDelta(); controls.update(); renderer.render(scene, camera); })();
-
-    }, (ev)=> {
-      if(ev.total) status.textContent = `⬇️ Chargement pop.glb ${(ev.loaded/ev.total*100).toFixed(0)}%`;
-    }, (err)=>{
-      console.error('Erreur glTF:', err);
-      status.style.color = '#ff9b9b';
-      status.textContent = '❌ Erreur: pop.glb introuvable (placez-le à la racine du repo)';
-      // animate fallback cube (ensure render loop)
-      (function loop(){ requestAnimationFrame(loop); cube.rotation.y += 0.01; controls.update(); renderer.render(scene, camera); })();
-    });
-
-    // apply texture function (applies to selected mesh only)
-    async function applyBoxTextureToSelected(){
-      if(meshList.length === 0){ alert('Aucun mesh disponible.'); return; }
-      const idx = parseInt(meshSelect.value, 10) || 0;
-      const target = meshList[idx].mesh;
-      status.textContent = '⬇️ Chargement texture…';
-      try{
-        const texLoader = new THREE.TextureLoader();
-        const texture = await new Promise((res, rej)=>{
-          texLoader.load('box_template_blank.png', res, undefined, rej);
-        });
-        // crisp/pixel-art settings
-        texture.flipY = false; // important for GLTF UV
+      // texture boîte
+      texLoader.load("box_template_blank.png", (texture) => {
+        texture.flipY = false;
         texture.encoding = THREE.sRGBEncoding;
         texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter; // disable mipmaps for pixel-crisp
+        texture.minFilter = THREE.NearestFilter;
         texture.generateMipmaps = false;
-        texture.needsUpdate = true;
 
-        // apply only to the selected mesh
-        if(target && target.isMesh){
-          // Clone material to avoid overwriting other instances
-          const mat = target.material.clone ? target.material.clone() : new THREE.MeshStandardMaterial();
-          mat.map = texture;
-          mat.needsUpdate = true;
-          target.material = mat;
-          status.textContent = `✅ Texture appliquée sur "${meshList[idx].name}"`;
-          console.log('Texture applied to', meshList[idx].name, target);
-        } else {
-          status.textContent = '❌ Cible invalide';
-        }
-      } catch(e){
-        console.error('Erreur texture:', e);
-        status.textContent = '❌ Texture introuvable';
-      }
+        model.traverse((child)=>{
+          if(child.isMesh && child.name.startsWith("box_")){
+            child.material = new THREE.MeshStandardMaterial({ map: texture });
+          }
+          if(child.isMesh && child.name.startsWith("fig_")){
+            figurineMeshes.push(child); // enregistrer pour skins
+          }
+        });
+        console.log("✅ Texture boîte appliquée");
+      });
+
+      // essayer de charger skin par défaut
+      texLoader.load("skin.png", (skinTex)=>{
+        applySkinTexture(skinTex);
+        console.log("✅ Skin par défaut appliqué");
+      }, undefined, ()=> {
+        console.warn("⚠️ Aucun skin.png trouvé");
+      });
+
+      status.textContent = "✅ Modèle chargé";
+
+      // rotation auto
+      let autoRotate = true;
+      controls.addEventListener("start", () => autoRotate=false);
+      controls.addEventListener("end", () => setTimeout(()=> autoRotate=true, 1200));
+
+      const clock = new THREE.Clock();
+      (function tick(){
+        requestAnimationFrame(tick);
+        if(autoRotate) modelGroup.rotation.y += 0.4 * clock.getDelta();
+        controls.update();
+        renderer.render(scene, camera);
+      })();
+    });
+
+    // appliquer une texture skin aux meshes "fig_"
+    function applySkinTexture(texture){
+      texture.flipY = false;
+      texture.encoding = THREE.sRGBEncoding;
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.generateMipmaps = false;
+
+      figurineMeshes.forEach(mesh=>{
+        mesh.material = new THREE.MeshStandardMaterial({ map: texture });
+      });
     }
 
-    // default behavior: when user clicks apply, call function
-    applyTexBtn.addEventListener('click', applyBoxTextureToSelected);
+    // uploader un skin
+    fileInput.addEventListener("change", (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const url = URL.createObjectURL(file);
+      const texLoader = new THREE.TextureLoader();
+      texLoader.load(url, (texture)=>{
+        applySkinTexture(texture);
+        status.textContent = "✅ Nouveau skin appliqué";
+      });
+    });
 
-    // convenience: apply automatically to detected candidate if any
-    // we'll try auto-apply once (if candidate found)
-    setTimeout(()=>{
-      if(meshList.length && meshSelect.options.length){
-        // find candidate option
-        let candidate = -1;
-        for(let i=0;i<meshSelect.options.length;i++){
-          const n = meshSelect.options[i].text.toLowerCase();
-          if(n.includes('box')||n.includes('pack')||n.includes('case')||n.includes('boite')) { candidate = i; break; }
-        }
-        if(candidate>=0){ meshSelect.selectedIndex = candidate; applyBoxTextureToSelected(); }
-      }
-    }, 800);
-
-    // resize handling
+    // resize
     window.addEventListener('resize', ()=>{
-      const w = Math.max(320, viewer.clientWidth), h = Math.max(240, viewer.clientHeight);
+      const w = viewer.clientWidth, h = viewer.clientHeight;
       camera.aspect = w/h; camera.updateProjectionMatrix();
       renderer.setSize(w,h);
     });
-
-    // initial render loop (in case gltf didn't start animation yet)
-    (function initialRender(){
-      requestAnimationFrame(initialRender);
-      controls.update();
-      renderer.render(scene, camera);
-    })();
-
   </script>
 </body>
 </html>
