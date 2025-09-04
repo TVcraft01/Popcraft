@@ -83,22 +83,29 @@
       scene.remove(cube);
       const model = gltf.scene;
 
-      // Charger la texture de boîte si elle existe
-      const texLoader = new THREE.TextureLoader();
-      texLoader.load("box_template_blank.png",
-        (texture)=>{
-          texture.flipY = false; // important pour glTF
-          model.traverse((child)=>{
-            if(child.isMesh){
-              child.material.map = texture;
-              child.material.needsUpdate = true;
-            }
-          });
-          status.textContent = '✅ Modèle + texture appliqués';
-        },
-        undefined,
-        ()=>{ status.textContent = '⚠️ Modèle chargé sans texture'; }
-      );
+// Charger la texture de boîte si elle existe
+const texLoader = new THREE.TextureLoader();
+texLoader.load("box_template_blank.png",
+  (texture)=>{
+    // Empêcher le flou
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestMipmapNearestFilter;
+    texture.flipY = false;
+
+    // Appliquer seulement aux meshes qui correspondent à la boîte
+    model.traverse((child)=>{
+      if(child.isMesh && child.name.toLowerCase().includes("box")){
+        child.material.map = texture;
+        child.material.needsUpdate = true;
+      }
+    });
+
+    status.textContent = '✅ Modèle + texture appliqués (boîte uniquement)';
+  },
+  undefined,
+  ()=>{ status.textContent = '⚠️ Modèle chargé sans texture'; }
+);
+
 
       // Auto-centre et met à l'échelle raisonnable
       const box = new THREE.Box3().setFromObject(model);
