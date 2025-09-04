@@ -2,13 +2,17 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>PopCraft — Test 3D</title>
+  <title>PopCraft — Test Cube</title>
   <style>
-    body { margin:0; background:#000; color:#fff; }
+    body { margin:0; background:#000; overflow:hidden; }
     header { text-align:center; padding:20px 0; background: linear-gradient(135deg, #06c9d8 50%, transparent 50%); }
     header img { height:100px; }
-    #viewer { width:100vw; height:calc(100vh - 140px); background:#222; }
-    #status { position:absolute; top:10px; left:10px; color:white; background:rgba(0,0,0,0.6); padding:6px 10px; border-radius:6px; }
+    #viewer { width:100vw; height:calc(100vh - 140px); background:#555; }
+    #status {
+      position:absolute; top:10px; left:10px;
+      background:rgba(0,0,0,0.7); color:#fff;
+      padding:6px 10px; border-radius:6px; font-family:sans-serif;
+    }
   </style>
 </head>
 <body>
@@ -29,14 +33,14 @@
     // Scene
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, viewer.clientWidth/viewer.clientHeight, 0.1, 1000);
-    camera.position.z = 5;
+    camera.position.set(0, 2, 8);
 
     const renderer = new THREE.WebGLRenderer({antialias:true});
     renderer.setSize(viewer.clientWidth, viewer.clientHeight);
     viewer.appendChild(renderer.domElement);
 
     // Lumières
-    scene.add(new THREE.AmbientLight(0x888888));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const dir = new THREE.DirectionalLight(0xffffff, 1);
     dir.position.set(5,5,5);
     scene.add(dir);
@@ -44,28 +48,30 @@
     // Contrôles
     const controls = new OrbitControls(camera, renderer.domElement);
 
-    // Cube par défaut
-    const geom = new THREE.BoxGeometry(1,1,1);
-    const mat = new THREE.MeshStandardMaterial({color:0x00ff00});
+    // Cube géant rouge par défaut
+    const geom = new THREE.BoxGeometry(3,3,3);
+    const mat = new THREE.MeshStandardMaterial({color:0xff0000});
     const cube = new THREE.Mesh(geom, mat);
     scene.add(cube);
-    status.textContent = "Cube affiché (fallback)";
+    status.textContent = "Cube rouge affiché (fallback)";
 
     // Tentative de charger pop.obj
     const loader = new OBJLoader();
     loader.load("pop.obj", (obj)=>{
       console.log("✅ pop.obj chargé");
-      status.textContent = "pop.obj chargé";
-      scene.remove(cube); // enlever le cube
+      status.textContent = "pop.obj chargé ✅";
+      scene.remove(cube);
+      obj.scale.set(1.5,1.5,1.5);
       scene.add(obj);
     }, undefined, (err)=>{
       console.error("❌ Erreur pop.obj:", err);
-      status.textContent = "Erreur: pop.obj introuvable";
+      status.textContent = "Erreur: pop.obj introuvable ❌";
     });
 
     // Animation
     function animate(){
       requestAnimationFrame(animate);
+      cube.rotation.y += 0.01; // le cube tourne toujours
       controls.update();
       renderer.render(scene, camera);
     }
