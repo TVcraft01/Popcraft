@@ -60,11 +60,6 @@
     dir.position.set(4,6,6);
     scene.add(dir);
 
-    // Sol doux pour l'ombre (optionnel)
-    const g = new THREE.PlaneGeometry(40,40);
-    const m = new THREE.MeshBasicMaterial({ color:0x101114 });
-    const floor = new THREE.Mesh(g,m); floor.rotation.x = -Math.PI/2; floor.position.y = -1.2; floor.visible=false; scene.add(floor);
-
     // Contrôles (drag pour tourner)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -82,27 +77,44 @@
 
     // Chargement du modèle glTF
     const loader = new GLTFLoader();
-    // Ajoute un cache-busting simple pour contourner le cache GH Pages
     const url = 'pop.glb' + (location.hostname.includes('github.io') ? `?v=${Date.now()}` : '');
 
     loader.load(url, (gltf)=>{
-      // Remplacer le cube par la pop
       scene.remove(cube);
       const model = gltf.scene;
+
+      // Charger la texture de boîte si elle existe
+      const texLoader = new THREE.TextureLoader();
+      texLoader.load("box_template_blank.png",
+        (texture)=>{
+          texture.flipY = false; // important pour glTF
+          model.traverse((child)=>{
+            if(child.isMesh){
+              child.material.map = texture;
+              child.material.needsUpdate = true;
+            }
+          });
+          status.textContent = '✅ Modèle + texture appliqués';
+        },
+        undefined,
+        ()=>{ status.textContent = '⚠️ Modèle chargé sans texture'; }
+      );
+
       // Auto-centre et met à l'échelle raisonnable
       const box = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3(); box.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const scale = 3.2 / maxDim; // vise ~3.2 unités de haut max
+      const scale = 3.2 / maxDim;
       model.scale.setScalar(scale);
-      // re-centre
+
+      // Re-centre
       const center = new THREE.Vector3(); box.getCenter(center);
       model.position.sub(center.multiplyScalar(scale));
       scene.add(model);
-      status.textContent = '✅ Modèle pop.glb chargé';
 
-      // Rotation douce si l'utilisateur ne touche pas
-      let autoRotate = true; controls.addEventListener('start', ()=> autoRotate=false);
+      // Rotation douce
+      let autoRotate = true;
+      controls.addEventListener('start', ()=> autoRotate=false);
       controls.addEventListener('end', ()=> setTimeout(()=> autoRotate=true, 1200));
 
       const clock = new THREE.Clock();
@@ -119,12 +131,8 @@
       console.error('Erreur glTF:', err);
       status.style.color = '#ff9b9b';
       status.textContent = '❌ Erreur: pop.glb introuvable (placez-le à la racine du repo)';
-      // Continue quand même avec le cube
       function animate(){ requestAnimationFrame(animate); cube.rotation.y += 0.01; controls.update(); renderer.render(scene,camera);} animate();
     });
-
-    // Fallback: si glTF ne démarre pas dans 2s, au moins animer le cube
-    let started = false; setTimeout(()=>{ if(!started){ started=true; (function anim(){ requestAnimationFrame(anim); cube.rotation.y += 0.01; controls.update(); renderer.render(scene,camera); })(); }}, 2000);
 
     // Resize
     window.addEventListener('resize', ()=>{
