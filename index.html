@@ -10,18 +10,16 @@
     html,body{ margin:0; height:100%; background:#111; color:#e9eef1; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial; }
     header{ height:120px; display:grid; place-items:center; background:linear-gradient(135deg, var(--accent) 50%, transparent 50%); }
     header img{ height:90px; object-fit:contain; }
-    #viewer{ width:100vw; height:calc(100vh - 160px); touch-action:none; }
+    #viewer{ width:100vw; height:calc(100vh - 180px); touch-action:none; }
     #status{ position:fixed; top:10px; left:10px; padding:6px 10px; border-radius:6px; background:rgba(0,0,0,.7); color:#aefaa0; font:12px/1.2 monospace; z-index:10 }
     .hint{ position:fixed; bottom:12px; left:12px; z-index:10; color:#9aa4ab; font-size:13px; background:rgba(0,0,0,0.35); padding:8px; border-radius:8px}
-    #skinUpload{ position:fixed; top:10px; right:10px; z-index:20; background:rgba(0,0,0,0.6); padding:6px 10px; border-radius:8px; }
-    #skinUpload input{ display:none; }
-    #skinUpload label{ cursor:pointer; color:#fff; font-size:13px; }
+    #controlsUI{ position:fixed; top:10px; right:10px; z-index:20; background:rgba(0,0,0,0.6); padding:8px; border-radius:8px; color:#fff; font-size:13px }
+    #controlsUI input{ display:none; }
+    #controlsUI label, #controlsUI button{ cursor:pointer; color:#fff; font-size:13px; margin-right:6px; }
+    #username{ padding:4px; border-radius:4px; border:none; margin-right:4px; }
   </style>
   
-  <!-- Polyfill import maps pour compatibilité téléphone -->
   <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.min.js"></script>
-  
-  <!-- Import map (CDN three.js modules) -->
   <script type="importmap">
   {
     "imports": {
@@ -38,10 +36,14 @@
 
   <div id="viewer"></div>
   <div id="status">⏳ Chargement…</div>
-  <div id="skinUpload">
-    <label for="fileInput">📂 Uploader un skin</label>
+
+  <div id="controlsUI">
+    <label for="fileInput">📂 Skin</label>
     <input type="file" id="fileInput" accept="image/png">
+    <input type="text" id="username" placeholder="Pseudo Minecraft">
+    <button id="fetchSkin">🔍</button>
   </div>
+
   <div class="hint">Clique / glisse pour tourner — relâchement remet la rotation auto</div>
 
   <script type="module">
@@ -52,10 +54,13 @@
     const status = document.getElementById('status');
     const viewer = document.getElementById('viewer');
     const fileInput = document.getElementById('fileInput');
+    const usernameEl = document.getElementById('username');
+    const fetchSkinBtn = document.getElementById('fetchSkin');
 
-    let figurineMeshes = []; // pour appliquer skin
+    let figurineMeshes = [];
+    let autoRotate = true;
 
-    // scène, caméra, rendu
+    // scene/camera/renderer
     let W = viewer.clientWidth, H = viewer.clientHeight;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
@@ -66,56 +71,52 @@
     renderer.setSize(W, H);
     viewer.appendChild(renderer.domElement);
 
-    // lumières
+    // lights
     scene.add(new THREE.AmbientLight(0xffffff, .8));
     const dir = new THREE.DirectionalLight(0xffffff, 1);
     dir.position.set(4,6,6);
     scene.add(dir);
 
-    // contrôles
+    // controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.enablePan = false;
-    controls.minDistance = 2.5;
-    controls.maxDistance = 12;
+    controls.enableZoom = false; // désactiver zoom
     controls.minPolarAngle = 0.35;
     controls.maxPolarAngle = Math.PI - 0.35;
 
-    // cube vert de secours
+    // fallback cube
     const cube = new THREE.Mesh(
       new THREE.BoxGeometry(2,2,2),
       new THREE.MeshStandardMaterial({ color:0x00ff00 })
     );
     scene.add(cube);
-    status.textContent = '✅ Cube affiché (en attente de pop.glb)…';
 
-    // group pour rotation centrée
+    // group for centered rotation
     const modelGroup = new THREE.Group();
     scene.add(modelGroup);
 
-    // chargeur GLTF
+    // loader
     const loader = new GLTFLoader();
     const url = 'pop.glb' + (location.hostname.includes('github.io') ? `?v=${Date.now()}` : '');
 
     loader.load(url, (gltf) => {
       scene.remove(cube);
-
       const model = gltf.scene;
       modelGroup.add(model);
 
-      // mise à l’échelle + centrage
+      // scale + center
       const bbox = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3(); bbox.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
       model.scale.setScalar(3.2 / maxDim);
-
       const bbox2 = new THREE.Box3().setFromObject(model);
       const center = new THREE.Vector3(); bbox2.getCenter(center);
       model.position.sub(center);
 
       const texLoader = new THREE.TextureLoader();
 
-      // texture boîte
+      // box texture
       texLoader.load("box_template_blank.png", (texture) => {
         texture.flipY = false;
         texture.encoding = THREE.sRGBEncoding;
@@ -128,60 +129,80 @@
             child.material = new THREE.MeshStandardMaterial({ map: texture });
           }
           if(child.isMesh && child.name.startsWith("fig_")){
-            figurineMeshes.push(child); // enregistrer pour skins
+            figurineMeshes.push(child);
           }
         });
-        console.log("✅ Texture boîte appliquée");
       });
 
-      // essayer de charger skin par défaut
+      // skin par défaut
       texLoader.load("skin.png", (skinTex)=>{
         applySkinTexture(skinTex);
-        console.log("✅ Skin par défaut appliqué");
-      }, undefined, ()=> {
-        console.warn("⚠️ Aucun skin.png trouvé");
       });
 
       status.textContent = "✅ Modèle chargé";
 
-      // rotation auto
-      let autoRotate = true;
-      controls.addEventListener("start", () => autoRotate=false);
-      controls.addEventListener("end", () => setTimeout(()=> autoRotate=true, 1200));
-
-      const clock = new THREE.Clock();
-      (function tick(){
-        requestAnimationFrame(tick);
-        if(autoRotate) modelGroup.rotation.y += 0.4 * clock.getDelta();
-        controls.update();
-        renderer.render(scene, camera);
-      })();
+    }, undefined, (err)=> {
+      status.textContent = "❌ Erreur: pop.glb manquant";
     });
 
-    // appliquer une texture skin aux meshes "fig_"
+    // appliquer skin
     function applySkinTexture(texture){
       texture.flipY = false;
       texture.encoding = THREE.sRGBEncoding;
       texture.magFilter = THREE.NearestFilter;
       texture.minFilter = THREE.NearestFilter;
       texture.generateMipmaps = false;
-
       figurineMeshes.forEach(mesh=>{
-        mesh.material = new THREE.MeshStandardMaterial({ map: texture });
+        mesh.material = new THREE.MeshStandardMaterial({
+          map: texture,
+          transparent: true,
+          alphaTest: 0.3,
+          side: THREE.DoubleSide
+        });
       });
     }
 
-    // uploader un skin
+    // upload skin
     fileInput.addEventListener("change", (e)=>{
       const file = e.target.files[0];
       if(!file) return;
       const url = URL.createObjectURL(file);
-      const texLoader = new THREE.TextureLoader();
-      texLoader.load(url, (texture)=>{
+      new THREE.TextureLoader().load(url, (texture)=>{
         applySkinTexture(texture);
         status.textContent = "✅ Nouveau skin appliqué";
       });
     });
+
+    // fetch skin par pseudo (via Crafatar)
+    fetchSkinBtn.addEventListener("click", ()=>{
+      const name = usernameEl.value.trim();
+      if(!name) return;
+      const url = `https://mineskin.eu/skin/${encodeURIComponent(name)}.png`;
+      new THREE.TextureLoader().load(url, (texture)=>{
+        applySkinTexture(texture);
+        status.textContent = `✅ Skin récupéré pour ${name}`;
+      }, undefined, ()=> {
+        status.textContent = `❌ Impossible de charger le skin de ${name}`;
+      });
+    });
+
+    // auto rotate logic
+    controls.addEventListener("start", ()=> autoRotate=false);
+    controls.addEventListener("end", ()=> setTimeout(()=> autoRotate=true, 1200));
+
+    const clock = new THREE.Clock();
+    function animate(){
+      requestAnimationFrame(animate);
+      if(autoRotate){
+        modelGroup.rotation.y += 0.4 * clock.getDelta();
+        // redresser progressivement la pop si trop inclinée
+        modelGroup.rotation.x *= 0.9;
+        modelGroup.rotation.z *= 0.9;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
 
     // resize
     window.addEventListener('resize', ()=>{
