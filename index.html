@@ -1,85 +1,136 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <title>PopCraft — Test glTF</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PopCraft — Viewer</title>
   <style>
-    body { margin:0; overflow:hidden; background:#111; }
-    header { text-align:center; padding:20px 0; background: linear-gradient(135deg, #06c9d8 50%, transparent 50%); }
-    header img { height:100px; }
-    #viewer { width:100vw; height:calc(100vh - 140px); }
-    #status {
-      position:absolute; top:10px; left:10px;
-      background:rgba(0,0,0,0.7); color:#0f0;
-      padding:6px 10px; border-radius:6px; font-family:monospace;
-    }
+    :root{ --bg:#0e0f12; --panel:#121418; --accent:#06c9d8; }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; height:100%; background:#111; color:#e9eef1; font-family:system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; }
+    header{ height:120px; display:grid; place-items:center; background:linear-gradient(135deg, var(--accent) 50%, transparent 50%); }
+    header img{ height:90px; object-fit:contain; }
+    #viewer{ width:100vw; height:calc(100vh - 120px); touch-action:none; }
+    #status{ position:fixed; top:10px; left:10px; padding:6px 10px; border-radius:6px; background:rgba(0,0,0,.7); color:#aefaa0; font:12px/1.2 monospace; z-index:10 }
   </style>
+  
+  <!-- Polyfill import maps for older/phone browsers -->
+  <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.min.js"></script>
+  
+  <!-- Import map: remap bare specifiers to CDN URLs (works on GitHub Pages) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
-  <header><img src="popcraft_title.png" alt="PopCraft"></header>
+  <header>
+    <!-- Placez popcraft_title.png à la racine du repo -->
+    <img src="popcraft_title.png" alt="PopCraft" onerror="this.style.display='none'">
+  </header>
   <div id="viewer"></div>
   <div id="status">⏳ Chargement…</div>
 
   <script type="module">
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-    import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-    import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-    const status = document.getElementById("status");
-    const viewer = document.getElementById("viewer");
+    const status = document.getElementById('status');
+    const viewer = document.getElementById('viewer');
+    const W = viewer.clientWidth, H = viewer.clientHeight;
 
-    // Scene & Camera
+    // --- Scène de base
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, viewer.clientWidth/viewer.clientHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(45, W/H, 0.1, 1000);
     camera.position.set(0, 2, 6);
 
-    const renderer = new THREE.WebGLRenderer({antialias:true});
-    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(W, H);
     viewer.appendChild(renderer.domElement);
 
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    // Lumières
+    scene.add(new THREE.AmbientLight(0xffffff, .7));
     const dir = new THREE.DirectionalLight(0xffffff, 1);
-    dir.position.set(5,5,5);
+    dir.position.set(4,6,6);
     scene.add(dir);
 
-    // Controls
+    // Sol doux pour l'ombre (optionnel)
+    const g = new THREE.PlaneGeometry(40,40);
+    const m = new THREE.MeshBasicMaterial({ color:0x101114 });
+    const floor = new THREE.Mesh(g,m); floor.rotation.x = -Math.PI/2; floor.position.y = -1.2; floor.visible=false; scene.add(floor);
+
+    // Contrôles (drag pour tourner)
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.minDistance = 2.5; controls.maxDistance = 12;
+    controls.minPolarAngle = 0.35; controls.maxPolarAngle = Math.PI - 0.35; // limite haut/bas
 
-    // Cube vert par défaut
-    const geom = new THREE.BoxGeometry(2,2,2);
-    const mat = new THREE.MeshStandardMaterial({color:0x00ff00});
-    const cube = new THREE.Mesh(geom, mat);
+    // Cube de secours (s'affiche pendant le chargement ou si erreur)
+    const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(2,2,2),
+      new THREE.MeshStandardMaterial({ color:0x00ff00 })
+    );
     scene.add(cube);
-    status.textContent = "✅ Cube affiché (en attente pop.glb)";
+    status.textContent = '✅ Cube affiché (en attente du modèle pop.glb)…';
 
-    // Charger pop.glb
+    // Chargement du modèle glTF
     const loader = new GLTFLoader();
-    loader.load("pop.glb", (gltf)=>{
+    // Ajoute un cache-busting simple pour contourner le cache GH Pages
+    const url = 'pop.glb' + (location.hostname.includes('github.io') ? `?v=${Date.now()}` : '');
+
+    loader.load(url, (gltf)=>{
+      // Remplacer le cube par la pop
       scene.remove(cube);
-      gltf.scene.scale.set(1.5,1.5,1.5);
-      scene.add(gltf.scene);
-      status.textContent = "✅ pop.glb chargé";
-    }, undefined, (err)=>{
-      console.error("❌ Erreur glTF:", err);
-      status.textContent = "❌ Erreur: pop.glb introuvable";
+      const model = gltf.scene;
+      // Auto-centre et met à l'échelle raisonnable
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3(); box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const scale = 3.2 / maxDim; // vise ~3.2 unités de haut max
+      model.scale.setScalar(scale);
+      // re-centre
+      const center = new THREE.Vector3(); box.getCenter(center);
+      model.position.sub(center.multiplyScalar(scale));
+      scene.add(model);
+      status.textContent = '✅ Modèle pop.glb chargé';
+
+      // Rotation douce si l'utilisateur ne touche pas
+      let autoRotate = true; controls.addEventListener('start', ()=> autoRotate=false);
+      controls.addEventListener('end', ()=> setTimeout(()=> autoRotate=true, 1200));
+
+      const clock = new THREE.Clock();
+      function tick(){
+        requestAnimationFrame(tick);
+        if(autoRotate) model.rotation.y += 0.4 * clock.getDelta();
+        controls.update();
+        renderer.render(scene, camera);
+      }
+      tick();
+    }, (ev)=>{
+      if(ev.total) status.textContent = `⬇️ Chargement pop.glb ${(ev.loaded/ev.total*100).toFixed(0)}%`;
+    }, (err)=>{
+      console.error('Erreur glTF:', err);
+      status.style.color = '#ff9b9b';
+      status.textContent = '❌ Erreur: pop.glb introuvable (placez-le à la racine du repo)';
+      // Continue quand même avec le cube
+      function animate(){ requestAnimationFrame(animate); cube.rotation.y += 0.01; controls.update(); renderer.render(scene,camera);} animate();
     });
 
-    // Loop
-    function animate(){
-      requestAnimationFrame(animate);
-      cube.rotation.y += 0.01;
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
+    // Fallback: si glTF ne démarre pas dans 2s, au moins animer le cube
+    let started = false; setTimeout(()=>{ if(!started){ started=true; (function anim(){ requestAnimationFrame(anim); cube.rotation.y += 0.01; controls.update(); renderer.render(scene,camera); })(); }}, 2000);
 
     // Resize
-    window.addEventListener("resize", ()=>{
-      camera.aspect = viewer.clientWidth/viewer.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+    window.addEventListener('resize', ()=>{
+      const w = viewer.clientWidth, h = viewer.clientHeight;
+      camera.aspect = w/h; camera.updateProjectionMatrix();
+      renderer.setSize(w,h);
     });
   </script>
 </body>
