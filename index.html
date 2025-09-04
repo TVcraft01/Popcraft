@@ -5,18 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PopCraft — Viewer</title>
   <style>
-    :root{ --bg:#0e0f12; --panel:#121418; --accent:#06c9d8; }
+    :root{ --bg:#0e0f12; --accent:#06c9d8; }
     *{ box-sizing:border-box; }
-    html,body{ margin:0; height:100%; background:#111; color:#e9eef1; font-family:system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial; }
-    header{ height:120px; display:grid; place-items:center; background:linear-gradient(135deg, var(--accent) 50%, transparent 50%); }
-    header img{ height:90px; object-fit:contain; }
-    #viewer{ width:100vw; height:calc(100vh - 180px); touch-action:none; }
-    #status{ position:fixed; top:10px; left:10px; padding:6px 10px; border-radius:6px; background:rgba(0,0,0,.7); color:#aefaa0; font:12px/1.2 monospace; z-index:10 }
-    .hint{ position:fixed; bottom:12px; left:12px; z-index:10; color:#9aa4ab; font-size:13px; background:rgba(0,0,0,0.35); padding:8px; border-radius:8px}
-    #controlsUI{ position:fixed; top:10px; right:10px; z-index:20; background:rgba(0,0,0,0.6); padding:8px; border-radius:8px; color:#fff; font-size:13px }
-    #controlsUI input{ display:none; }
-    #controlsUI label, #controlsUI button{ cursor:pointer; color:#fff; font-size:13px; margin-right:6px; }
-    #username{ padding:4px; border-radius:4px; border:none; margin-right:4px; }
+    html,body{ margin:0; height:100%; background:#111; color:#e9eef1;
+      font-family:system-ui, -apple-system, "Segoe UI", Roboto, Inter, Arial; }
+    header{ height:100px; display:grid; place-items:center;
+      background:linear-gradient(135deg, var(--accent) 50%, transparent 50%); }
+    header img{ height:80px; object-fit:contain; }
+    main{ display:flex; height:calc(100vh - 100px); }
+    #viewer{ flex:1; touch-action:none; }
+    #sidebar{ width:280px; background:#181a1f; padding:12px; }
+    #status{ margin-bottom:10px; padding:6px 10px; border-radius:6px;
+      background:rgba(0,0,0,.7); color:#aefaa0; font:12px/1.2 monospace }
+    #sidebar input[type="file"]{ display:none; }
+    label, button{ display:inline-block; margin:6px 0; cursor:pointer; padding:6px 10px;
+      border-radius:6px; background:#06c9d8; color:#041414; border:none; }
+    #username{ width:100%; padding:6px; margin:6px 0; border-radius:6px; border:none; }
+    .hint{ position:fixed; bottom:12px; left:12px; z-index:10; color:#9aa4ab;
+      font-size:13px; background:rgba(0,0,0,0.35); padding:8px; border-radius:8px }
   </style>
   
   <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.min.js"></script>
@@ -33,17 +39,16 @@
   <header>
     <img src="popcraft_title.png" alt="PopCraft" onerror="this.style.display='none'">
   </header>
-
-  <div id="viewer"></div>
-  <div id="status">⏳ Chargement…</div>
-
-  <div id="controlsUI">
-    <label for="fileInput">📂 Skin</label>
-    <input type="file" id="fileInput" accept="image/png">
-    <input type="text" id="username" placeholder="Pseudo Minecraft">
-    <button id="fetchSkin">🔍</button>
-  </div>
-
+  <main>
+    <div id="viewer"></div>
+    <div id="sidebar">
+      <div id="status">⏳ Chargement…</div>
+      <label for="fileInput">📂 Importer skin</label>
+      <input type="file" id="fileInput" accept="image/png">
+      <input type="text" id="username" placeholder="Pseudo Minecraft">
+      <button id="fetchSkin">🔍 Charger skin</button>
+    </div>
+  </main>
   <div class="hint">Clique / glisse pour tourner — relâchement remet la rotation auto</div>
 
   <script type="module">
@@ -58,7 +63,6 @@
     const fetchSkinBtn = document.getElementById('fetchSkin');
 
     let figurineMeshes = [];
-    let autoRotate = true;
 
     // scene/camera/renderer
     let W = viewer.clientWidth, H = viewer.clientHeight;
@@ -81,9 +85,9 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.enablePan = false;
-    controls.enableZoom = false; // désactiver zoom
-    controls.minPolarAngle = 0.35;
-    controls.maxPolarAngle = Math.PI - 0.35;
+    controls.enableZoom = false; // désactive zoom
+    controls.autoRotate = true;  // rotation intégrée
+    controls.autoRotateSpeed = 2;
 
     // fallback cube
     const cube = new THREE.Mesh(
@@ -92,14 +96,13 @@
     );
     scene.add(cube);
 
-    // group for centered rotation
+    // group
     const modelGroup = new THREE.Group();
     scene.add(modelGroup);
 
     // loader
     const loader = new GLTFLoader();
     const url = 'pop.glb' + (location.hostname.includes('github.io') ? `?v=${Date.now()}` : '');
-
     loader.load(url, (gltf) => {
       scene.remove(cube);
       const model = gltf.scene;
@@ -110,20 +113,15 @@
       const size = new THREE.Vector3(); bbox.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
       model.scale.setScalar(3.2 / maxDim);
-      const bbox2 = new THREE.Box3().setFromObject(model);
-      const center = new THREE.Vector3(); bbox2.getCenter(center);
+      const center = new THREE.Vector3(); bbox.getCenter(center);
       model.position.sub(center);
 
       const texLoader = new THREE.TextureLoader();
-
-      // box texture
+      // box
       texLoader.load("box_template_blank.png", (texture) => {
-        texture.flipY = false;
-        texture.encoding = THREE.sRGBEncoding;
         texture.magFilter = THREE.NearestFilter;
         texture.minFilter = THREE.NearestFilter;
-        texture.generateMipmaps = false;
-
+        texture.flipY = false;
         model.traverse((child)=>{
           if(child.isMesh && child.name.startsWith("box_")){
             child.material = new THREE.MeshStandardMaterial({ map: texture });
@@ -133,31 +131,22 @@
           }
         });
       });
-
-      // skin par défaut
-      texLoader.load("skin.png", (skinTex)=>{
-        applySkinTexture(skinTex);
-      });
-
+      // default skin
+      texLoader.load("skin.png", (skinTex)=> applySkinTexture(skinTex));
       status.textContent = "✅ Modèle chargé";
-
-    }, undefined, (err)=> {
-      status.textContent = "❌ Erreur: pop.glb manquant";
     });
 
-    // appliquer skin
+    // apply skin
     function applySkinTexture(texture){
-      texture.flipY = false;
-      texture.encoding = THREE.sRGBEncoding;
       texture.magFilter = THREE.NearestFilter;
       texture.minFilter = THREE.NearestFilter;
-      texture.generateMipmaps = false;
+      texture.flipY = false;
       figurineMeshes.forEach(mesh=>{
         mesh.material = new THREE.MeshStandardMaterial({
           map: texture,
           transparent: true,
-          alphaTest: 0.3,
-          side: THREE.DoubleSide
+          alphaTest: 0.1,   // garder la couche en dessous visible
+          side: THREE.FrontSide
         });
       });
     }
@@ -173,33 +162,24 @@
       });
     });
 
-    // fetch skin par pseudo (via Crafatar)
+    // fetch skin
     fetchSkinBtn.addEventListener("click", ()=>{
       const name = usernameEl.value.trim();
       if(!name) return;
-      const url = `https://mineskin.eu/skin/${encodeURIComponent(name)}.png`;
+      const url = `https://crafatar.com/skins/${encodeURIComponent(name)}`;
       new THREE.TextureLoader().load(url, (texture)=>{
         applySkinTexture(texture);
-        status.textContent = `✅ Skin récupéré pour ${name}`;
-      }, undefined, ()=> {
-        status.textContent = `❌ Impossible de charger le skin de ${name}`;
-      });
+        status.textContent = `✅ Skin de ${name}`;
+      }, undefined, ()=> status.textContent = `❌ Skin introuvable`);
     });
 
-    // auto rotate logic
-    controls.addEventListener("start", ()=> autoRotate=false);
-    controls.addEventListener("end", ()=> setTimeout(()=> autoRotate=true, 1200));
-
-    const clock = new THREE.Clock();
+    // animation
     function animate(){
       requestAnimationFrame(animate);
-      if(autoRotate){
-        modelGroup.rotation.y += 0.4 * clock.getDelta();
-        // redresser progressivement la pop si trop inclinée
-        modelGroup.rotation.x *= 0.9;
-        modelGroup.rotation.z *= 0.9;
-      }
       controls.update();
+      // correction douce X/Z → retour droit
+      modelGroup.rotation.x *= 0.92;
+      modelGroup.rotation.z *= 0.92;
       renderer.render(scene, camera);
     }
     animate();
