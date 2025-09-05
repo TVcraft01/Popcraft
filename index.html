@@ -199,7 +199,7 @@
       console.log('Skin appliqué — overlay flags respectées');
     }
 
-    // overlay detection (explicit for fig_2nd_layer_, fallback heuristics)
+    // overlay detection
     function detectOverlayFromName(name){
       if(!name) return false;
       if(name.startsWith('fig_2nd_layer_')) return true;
@@ -207,7 +207,6 @@
       return n.includes('2nd') || n.includes('overlay') || n.includes('layer') || n.includes('hat') || n.includes('_1') || n.includes('outer');
     }
 
-    // build mesh list UI for toggle overlay
     function buildMeshListUI(){
       meshListBox.innerHTML = '';
       if(figurine.length === 0){
@@ -231,18 +230,14 @@
     }
 
     /*********************
-     * Model list (index.json) handling
+     * Model list handling
      *********************/
-    // index.json expected at 3D_display/index.json
     async function loadModelIndex(){
       try{
         const res = await fetch('3D_display/index.json');
         if(!res.ok) throw new Error('3D_display/index.json introuvable');
         const data = await res.json();
 
-        // support two formats:
-        // 1) ["basic_pop", "autre_pop"]
-        // 2) [ { id: "basic_pop", file: "basic_pop.glb", name: "Pop basique" }, ... ]
         let list = [];
         if(Array.isArray(data)){
           if(typeof data[0] === 'string'){
@@ -266,18 +261,16 @@
         } else {
           modelSelectorBox.style.display = 'block';
           modelSelect.innerHTML = '';
-          list.forEach((m, i)=>{
+          list.forEach((m)=>{ 
             const o = document.createElement('option');
-            o.value = JSON.stringify(m); // store object
+            o.value = JSON.stringify(m);
             o.textContent = m.displayName || m.id;
             modelSelect.appendChild(o);
           });
-          // load first
           const first = JSON.parse(modelSelect.options[0].value);
           await loadModelFromListEntry(first);
         }
 
-        // reload button handler (re-load currently selected)
         reloadModelBtn.onclick = async ()=> {
           if(modelSelect.value){
             const entry = JSON.parse(modelSelect.value);
@@ -291,33 +284,20 @@
       }
     }
 
-    /*********************
-     * Load a specific model entry
-     * entry = { id: 'basic_pop', file: 'basic_pop.glb', displayName: 'Pop basique' }
-     *********************/
     async function loadModelFromListEntry(entry){
       try{
         setStatus(`⏳ Chargement modèle ${entry.id} ...`);
-        // clean previous
-        modelGroup.traverse(c=>{ /* noop before clear */ });
-        // Dispose previous content
-        modelGroup.children.slice().forEach(ch=>{
-          disposeObject(ch);
-          modelGroup.remove(ch);
-        });
+        modelGroup.children.slice().forEach(ch=>{ disposeObject(ch); modelGroup.remove(ch); });
 
-        // construct paths
         const base = `3D_display/${entry.id}`;
         const glbPath = `${base}/${entry.file}`;
         const boxPath = `${base}/box_template_blank.png`;
         const skinDefaultPath = `${base}/skin.png`;
 
-        // load glb
         const gltf = await loader.loadAsync(glbPath);
         const model = gltf.scene;
         modelGroup.add(model);
 
-        // scale & center model inside modelGroup
         const bbox = new THREE.Box3().setFromObject(model);
         const size = new THREE.Vector3(); bbox.getSize(size);
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
@@ -328,7 +308,6 @@
         const center = new THREE.Vector3(); bbox2.getCenter(center);
         model.position.sub(center);
 
-        // reset figurine list and detect meshes
         figurine.length = 0;
         model.traverse((child)=>{
           if(child.isMesh && child.name && child.name.startsWith('fig_')){
@@ -337,10 +316,8 @@
             figurine.push({ name: nm, mesh: child, overlay });
           }
         });
-
         buildMeshListUI();
 
-        // apply box texture if exists (best effort)
         const texLoader = new THREE.TextureLoader();
         texLoader.load(boxPath, (boxTex)=>{
           boxTex.flipY = false;
@@ -348,166 +325,60 @@
           boxTex.magFilter = THREE.NearestFilter;
           boxTex.minFilter = THREE.NearestFilter;
           boxTex.generateMipmaps = false;
-          model.traverse((c)=>{
-            if(c.isMesh && c.name && c.name.startsWith('box_')){
-              c.material = new THREE.MeshStandardMaterial({ map: boxTex });
-            }
-          });
-        }, undefined, ()=> {
-          console.warn('box_template_blank.png non trouvé pour', entry.id);
+          model.traverse((c)=>{ if(c.isMesh && c.name && c.name.startsWith('box_')) c.material = new THREE.MeshStandardMaterial({ map: boxTex }); });
         });
 
-        // Try model-specific skin.png first, otherwise root skin.png
         let loadedSkin = null;
-        await new Promise((resolve)=>{
-          texLoader.load(skinDefaultPath, (t)=>{
-            loadedSkin = t; resolve();
-          }, undefined, ()=>{ resolve(); });
-        });
-        if(!loadedSkin){
-          await new Promise((resolve)=>{
-            texLoader.load('skin.png', (t)=>{ loadedSkin = t; resolve(); }, undefined, ()=> { resolve(); });
-          });
-        }
-        if(loadedSkin){
-          applySkinAndLayers(loadedSkin);
-          setStatus(`✅ ${entry.displayName || entry.id} chargé`, '');
-        } else {
-          setStatus(`⚠️ ${entry.displayName || entry.id} chargé — aucun skin par défaut trouvé`, '');
-        }
+        await new Promise((resolve)=>{ texLoader.load(skinDefaultPath, (t)=>{ loadedSkin = t; resolve(); }, undefined, ()=> resolve()); });
+        if(!loadedSkin){ await new Promise((resolve)=>{ texLoader.load('skin.png', (t)=>{ loadedSkin = t; resolve(); }, undefined, ()=> resolve()); }); }
+        if(loadedSkin){ applySkinAndLayers(loadedSkin); setStatus(`✅ ${entry.displayName || entry.id} chargé`, ''); }
+        else setStatus(`⚠️ ${entry.displayName || entry.id} chargé — aucun skin par défaut trouvé`, '');
 
-        // controls behavior: stop auto-rotate on interaction, then re-enable
         controls.addEventListener('start', ()=> controls.autoRotate = false);
-        controls.addEventListener('end', ()=> {
-          setTimeout(()=> {
-            // ensure camera not too high/low
-            const offset = camera.position.clone().sub(controls.target);
-            const sph = new THREE.Spherical(); sph.setFromVector3(offset);
-            const desiredPhi = Math.PI/2;
-            if(Math.abs(sph.phi - desiredPhi) > 0.5){
-              animateCameraToPhi(desiredPhi, 500);
-            }
-            setTimeout(()=> controls.autoRotate = true, 700);
-          }, 300);
-        });
+        controls.addEventListener('end', ()=>{ setTimeout(()=>{ controls.autoRotate = true; }, 700); });
 
-      } catch (err) {
-        console.error('Erreur loadModelFromListEntry', err);
-        setStatus(`❌ Erreur chargement ${entry.id} (${err.message || err})`, '#ff9b9b');
-      }
+      }catch(err){ console.error(err); setStatus(`❌ Erreur chargement ${entry.id}`, '#ff9b9b'); }
     }
 
     /*********************
-     * Camera animation helper
+     * Skin handling (upload + pseudo Ashcon)
      *********************/
-    let camAnimRunning = false;
-    function animateCameraToPhi(targetPhi, duration = 500){
-      if(camAnimRunning) return;
-      camAnimRunning = true;
-      controls.enabled = false;
-      const start = performance.now();
-      const offset = camera.position.clone().sub(controls.target);
-      const sph = new THREE.Spherical(); sph.setFromVector3(offset);
-      const startPhi = sph.phi, startTheta = sph.theta, radius = sph.radius;
-      const targetTheta = startTheta;
-
-      function step(){
-        const now = performance.now();
-        const p = Math.min(1, (now - start)/duration);
-        const ease = (p<0.5) ? (2*p*p) : (-1 + (4-2*p)*p);
-        const phi = THREE.MathUtils.lerp(startPhi, targetPhi, ease);
-        const newS = new THREE.Spherical(radius, phi, targetTheta);
-        const newPos = new THREE.Vector3().setFromSpherical(newS).add(controls.target);
-        camera.position.copy(newPos);
-        camera.lookAt(controls.target);
-        if(p < 1) requestAnimationFrame(step);
-        else { controls.enabled = true; camAnimRunning = false; }
-      }
-      requestAnimationFrame(step);
-    }
-
-    /*********************
-     * UI & interactions (skin upload, fetch, overlay re-detect, reset cam)
-     *********************/
-    // file upload
     fileInput.addEventListener('change', (e)=>{
       const f = e.target.files[0];
       if(!f) return;
       fileLabel.textContent = f.name;
       const url = URL.createObjectURL(f);
       const texLoader = new THREE.TextureLoader();
-      texLoader.load(url, (tex)=>{
-        applySkinAndLayers(tex);
-        setStatus('✅ Skin upload appliqué');
-      }, undefined, (err)=> { console.error(err); setStatus('❌ Erreur skin upload', '#ff9b9b'); });
+      texLoader.load(url, (tex)=>{ applySkinAndLayers(tex); setStatus('✅ Skin upload appliqué'); }, undefined, ()=> setStatus('❌ Erreur skin upload', '#ff9b9b'));
     });
-    // make labels open file dialog
     fileLabel.addEventListener('click', ()=> fileInput.click());
     document.querySelector('label[for="fileInput"]')?.addEventListener('click', ()=> fileInput.click());
 
-    // fetch skin by pseudo (Mojang -> Crafatar)
+    // ✅ Pseudo via Ashcon
     fetchSkinBtn.addEventListener('click', async ()=>{
       const name = usernameEl.value.trim();
       if(!name) { setStatus('⚠️ Entre un pseudo', '#ffcc00'); return; }
       setStatus(`🔎 Recherche ${name}…`);
       try{
-        const res = await fetch('https://api.mojang.com/users/profiles/minecraft/' + encodeURIComponent(name));
+        const res = await fetch('https://api.ashcon.app/mojang/v2/user/' + encodeURIComponent(name));
         if(!res.ok) throw new Error('user not found');
-        const j = await res.json();
-        const uuid = j.id;
-        const skinUrl = 'https://crafatar.com/skins/' + uuid;
+        const data = await res.json();
+        const skinUrl = data.textures?.skin?.url;
+        if(!skinUrl) throw new Error('skin not found');
         const texLoader = new THREE.TextureLoader();
-        texLoader.load(skinUrl, (tex)=>{
-          applySkinAndLayers(tex);
-          setStatus(`✅ Skin de ${name} appliqué`);
-        }, undefined, ()=> { setStatus('❌ Impossible de charger le skin', '#ff9b9b'); });
-      }catch(e){
-        console.warn(e);
-        setStatus('❌ Pseudo introuvable', '#ff9b9b');
-      }
+        texLoader.load(skinUrl, (tex)=>{ applySkinAndLayers(tex); setStatus(`✅ Skin de ${data.username} appliqué`); }, undefined, ()=> setStatus('❌ Impossible de charger le skin', '#ff9b9b'));
+      }catch(e){ console.warn(e); setStatus('❌ Pseudo introuvable', '#ff9b9b'); }
     });
 
-    // re-detect overlay heuristics
-    applyDetectedOverlayBtn.addEventListener('click', ()=>{
-      figurine.forEach(item => item.overlay = detectOverlayFromName(item.name));
-      buildMeshListUI();
-      if(currentSkinTexture) applySkinAndLayers(currentSkinTexture);
-      setStatus('🔧 Overlay heuristique réappliquée');
-    });
+    applyDetectedOverlayBtn.addEventListener('click', ()=>{ figurine.forEach(item => item.overlay = detectOverlayFromName(item.name)); buildMeshListUI(); if(currentSkinTexture) applySkinAndLayers(currentSkinTexture); setStatus('🔧 Overlay heuristique réappliquée'); });
+    resetCamBtn.addEventListener('click', ()=> camera.position.set(0,2,6));
 
-    // reset camera
-    resetCamBtn.addEventListener('click', ()=> animateCameraToPhi(Math.PI/2, 400));
-
-    // model selector change handler
-    modelSelect.addEventListener('change', async ()=>{
-      if(!modelSelect.value) return;
-      const entry = JSON.parse(modelSelect.value);
-      await loadModelFromListEntry(entry);
-    });
-
-    /*********************
-     * Init + render loop
-     *********************/
-    function renderLoop(){
-      requestAnimationFrame(renderLoop);
-      controls.update();
-      // gentle upright of modelGroup rotations X/Z
-      modelGroup.rotation.x = THREE.MathUtils.lerp(modelGroup.rotation.x, 0, 0.08);
-      modelGroup.rotation.z = THREE.MathUtils.lerp(modelGroup.rotation.z, 0, 0.08);
-      renderer.render(scene, camera);
-    }
+    function renderLoop(){ requestAnimationFrame(renderLoop); controls.update(); renderer.render(scene, camera); }
     renderLoop();
 
-    // resize
-    window.addEventListener('resize', ()=>{
-      const w = Math.max(320, viewer.clientWidth), h = Math.max(240, viewer.clientHeight);
-      camera.aspect = w/h; camera.updateProjectionMatrix();
-      renderer.setSize(w,h);
-    });
+    window.addEventListener('resize', ()=>{ const w = Math.max(320, viewer.clientWidth), h = Math.max(240, viewer.clientHeight); camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h); });
 
-    // start: load model index from 3D_display/index.json
     loadModelIndex();
-
   </script>
 </body>
 </html>
