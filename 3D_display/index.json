@@ -1,5 +1,3 @@
-{
-  "models": [
-    { "id": "basic_pop", "name": "Pop basique" }
-  ]
-}
+[
+  { "id": "basic_pop", "file": "basic_pop.glb", "name": "Basic Pop" }
+]
