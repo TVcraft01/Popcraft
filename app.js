@@ -1,125 +1,233 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// DOM Elements
+const usernameInput = document.getElementById('username');
+const form = document.getElementById('skinForm');
+const statusMessage = document.getElementById('statusMessage');
+const skinPreview = document.getElementById('skinPreview');
+const usernameDisplay = document.getElementById('usernameDisplay');
+const importBtn = document.getElementById('importBtn');
+const downloadBtn = document.getElementById('downloadBtn');
 
-// Get DOM elements
-const usernameInput = document.getElementById('usernameInput');
-const updateBtn = document.getElementById('updateBtn');
-const loadingOverlay = document.getElementById('loading');
-const canvas = document.getElementById('minecraft-canvas');
+// Configuration
+const DEFAULT_SKIN = 'https://minotar.net/armor/body/steve.png';
+const CORS_PROXY = 'https://api.allorigins.win/raw?url=';
+const MINECRAFT_API = 'https://sessionserver.mojang.com/session/minecraft/profile/';
+const SKIN_BASE_URL = 'https://minotar.net/armor/body/';
+const FACE_BASE_URL = 'https://minotar.net/avatar/';
 
-// Scene setup
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
-renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-renderer.setClearColor(0x000000, 0); // Transparent background
+let skinViewer = null;
+let currentUsername = null;
+let currentSkinData = null;
 
-// Add lights
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-scene.add(ambientLight);
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-directionalLight.position.set(5, 5, 5).normalize();
-scene.add(directionalLight);
-
-// Load 3D model
-const loader = new GLTFLoader();
-let characterModel;
-
-loader.load(
-    './3D_display/basic_pop/basic_pop.glb',
-    (gltf) => {
-        characterModel = gltf.scene;
-        scene.add(characterModel);
-        animate();
-    },
-    undefined,
-    (error) => {
-        console.error('An error occurred loading the model:', error);
-        alert("An error occurred while loading the 3D model. Please try again later.");
-    }
-);
-
-// Camera and controls
-camera.position.z = 2.5;
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.enablePan = false;
-controls.minDistance = 2;
-controls.maxDistance = 5;
-
-// Animation loop
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-}
-
-// Function to update the skin
-async function updateSkin(username) {
-    if (!characterModel) return;
-
-    loadingOverlay.style.opacity = '1';
-    loadingOverlay.style.pointerEvents = 'auto';
-
-    const skinUrl = `https://minotar.net/skin/${username}`;
-    
+// Initialize the 3D skin viewer
+async function initSkinViewer(skinUrl = DEFAULT_SKIN) {
     try {
-        const texture = await new Promise((resolve, reject) => {
-            const textureLoader = new THREE.TextureLoader();
-            textureLoader.crossOrigin = 'anonymous';
-            textureLoader.load(
-                skinUrl,
-                (texture) => resolve(texture),
-                undefined,
-                (err) => reject(err)
-            );
-        });
-
-        // Find the "skin" material on the model
-        characterModel.traverse((child) => {
-            if (child.isMesh && child.material) {
-                if (child.material.map && child.material.map.name === 'skin.png') {
-                    child.material.map = texture;
-                    child.material.needsUpdate = true;
-                }
-            }
-        });
+        // Clear loading state
+        skinPreview.innerHTML = '';
         
+        if (window.skinview3d) {
+            // Destroy previous instance if exists
+            if (skinViewer) {
+                skinViewer.dispose();
+                skinViewer = null;
+            }
+            
+            // Create new instance with optimized settings
+            skinViewer = new skinview3d.SkinViewer({
+                canvas: skinPreview,
+                width: skinPreview.offsetWidth,
+                height: skinPreview.offsetHeight,
+                skin: skinUrl,
+                cache: true,
+                renderPaused: false,
+            });
+
+            // Optimize 3D rendering
+            skinViewer.camera.position.set(20, -10, 40);
+            skinViewer.camera.lookAt(0, 0, 0);
+            
+            // Add controls
+            const controls = new skinview3d.HammerControls(skinViewer, { radius: 60 });
+            
+            // Adjust for smaller screens
+            function resize() {
+                skinViewer.width = skinPreview.offsetWidth;
+                skinViewer.height = skinPreview.offsetHeight;
+                skinViewer.resize();
+            }
+            
+            window.addEventListener('resize', resize);
+            
+            // Pause rendering when tab is hidden for performance
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') {
+                    skinViewer.renderPaused = true;
+                } else {
+                    skinViewer.renderPaused = false;
+                }
+            });
+
+            // Load custom cape if available (from URL parameter)
+            const params = new URLSearchParams(window.location.search);
+            const capeUrl = params.get('cape');
+            if (capeUrl) {
+                skinViewer.loadCape(decodeURIComponent(capeUrl));
+            }
+
+            return skinViewer;
+        } else {
+            throw new Error('3D skin viewer not loaded');
+        }
     } catch (error) {
-        console.error("Failed to load skin:", error);
-        alert("The skin for this user could not be loaded. Please check the username.");
-    } finally {
-        loadingOverlay.style.opacity = '0';
-        loadingOverlay.style.pointerEvents = 'none';
+        console.error('Failed to initialize 3D viewer:', error);
+        showStatus('Failed to load 3D preview. Displaying static image.', 'error');
+        displayFallbackImage(skinUrl);
+        return null;
     }
 }
 
-// Event listeners
-updateBtn.addEventListener('click', () => {
-    const username = usernameInput.value.trim();
-    if (username) {
-        updateSkin(username);
+// Display fallback image if 3D viewer fails
+function displayFallbackImage(skinUrl) {
+    const img = document.createElement('img');
+    img.src = skinUrl.replace('/armor/body/', '/skin/');
+    img.alt = 'Minecraft skin';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'Color =contain';
+ '#f1f5f9';
+    skinPreview.innerHTML = '';
+    skinPreview.appendChild(img);
+}
+
+// Fetch Minecraft profile data (UUID and skin info)
+async function getPlayerProfile(username) {
+    try {
+        showStatus('Looking up player...', 'info');
+        
+ get skin        // First, get UUID from username using Mojang API (via CORS proxy)
+        const response = await fetch(CORS_PROXY + encodeURIComponent('https://api.mojang.com/users/profiles/minecraft/' + username));
+        
+        if (!response.ok) {
+            if/cape data
+        const profileResponse = await fetch(CORS_PROXY + encodeURIComponent(MINECRAFT_API + uuid));
+        
+        if (!profileResponse.ok) {
+            throw new Error('Failed to get skin data');
+        }
+        
+        const profileResult = await profileResponse.json();
+.error('Error loading skin:', error);
+        showStatus(error.message || 'Failed to load skin', 'error');
+        
+        // Reset UI
+        usernameDisplay.textContent = '';
+        importBtn.disabled = true;
+        const skinData = JSON.parse(window.atob(profileResult.properties[0].value));
+        
+        show
+        await initSkinViewer();
+    }
+}
+
+// Show status message
+function showStatus(message, type = 'info') {
+    statusMessage.textContent = message;
+    statusMessage.className = 'status-message ' + type;
+}
+
+// Update URL with current username (for sharing)
+function updateUrl(username) {
+    const newUrl = new URL(window.location.origin + window.location.pathname);
+    newUrl.searchParams.set('skin', username);
+    history.replaceState(null, '', newUrl);
+}
+
+// Get skin from URL parameter on load
+function getInitialSkin() {
+    const params = new URLSearchParams(window.location.search);
+    const skinParam = params.get('skin');
+    const urlParam = params.get('url');
+    
+    if (skinParam) {
+        loadSkin(skinParam);
+    } else if (urlParam) {
+        loadSkin(decodeURIComponent(urlParam));
     } else {
-        alert("Please enter a username.");
+        // Load default skin
+        loadSkin('Steve');
+    }
+}
+
+// Import skin to Popcraft (placeholder - implement actual integration)
+function importToPopcraft(skinData) {
+    // This would be replaced with actual Popcraft API integration
+    showStatus('Preparing to import to Popcraft...', 'info');
+    
+    // Example implementation (you'd replace this with actual Popcraft API call)
+    setTimeout(() => {
+        // In a real implementation, you would:
+        // 1. Authenticate the user (OAuth, API key, etc.)
+        // 2. Send the skin data to Popcraft's API
+        // 3. Handle the response
+        
+        // For demo purposes, we'll simulate a successful import
+        showStatus(`Successfully imported ${skinData.username}'s skin to Popcraft!`, 'success');
+        
+        // Optional: open Popcraft with the skin pre-loaded
+        const popcraftUrl = `https://popcraft.example.com?import-skin=${encodeURIComponent(skinData.skinUrl)}`;
+        window.open(popcraftUrl, '_blank');
+    }, 1000);
+}
+
+// Event Listeners
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = usernameInput.value.trim();
+    
+    if (username.length < 3) {
+        showStatus('Username must be at least 3 characters', 'error');
+        return;
+    }
+    
+    await loadSkin(username);
+});
+
+importBtn.addEventListener('click', () => {
+    if (currentSkinData) {
+        importToPopcraft(currentSkinData);
+    } else {
+        showStatus('No skin data to import', 'error');
     }
 });
 
-usernameInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        updateBtn.click();
+// Download current skin
+downloadBtn.addEventListener('click', (e) => {
+    if (currentUsername) {
+        const downloadUrl = `${SKIN_BASE_URL}${currentUsername}.png?overlay=true`;
+        downloadBtn.href = downloadUrl;
+        
+        // This will be handled by the <a> tag, but we can add tracking
+        console.log(`Downloading skin for ${currentUsername}`);
     }
 });
 
-// Initial load with a default skin
-updateSkin('MHF_Steve');
+// Load skin when page loads
+window.addEventListener('DOMContentLoaded', getInitialSkin);
 
-// Handle window resizing
-window.addEventListener('resize', () => {
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height);
+// Performance optimizations for 3D viewer
+window.addEventListener('beforeunload', () => {
+    if (skinViewer) {
+        skinViewer.dispose();
+        skinViewer = null;
+    }
 });
+
+// Load the 3D viewer library if not already loaded
+if (!window.skinview3d) {
+    const skinviewScript = document.querySelector('script[src*="skinview3d"]');
+    if (skinviewScript) {
+        skinviewScript.onerror = () => {
+            showStatus('3D preview requires internet connection. Using fallback mode.', 'info');
+            displayFallbackImage(DEFAULT_SKIN);
+        };
+    }
+}
