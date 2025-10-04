@@ -1,69 +1,284 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Popcraft Skin Viewer & Importer</title>
-    <meta name="description" content="View and import Minecraft skins for Popcraft instantly with our optimized tool.">
-    <link rel="stylesheet" href="styles.css">
-    <link rel="preload" href="https://unpkg.com/skinview3d@3.1.0/skinview3d.bundle.js" as="script">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PopCraft — Viewer + Pack Generator</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- libs -->
+  <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <!-- three importmap for 3D preview -->
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }}
+  </script>
 </head>
 <body>
-    <header class="header">
-        <div class="container">
-            <h1>Popcraft Skin Viewer</h1>
-            <p>Instantly view and import skins by entering a player name</p>
-        </div>
-    </header>
+  <header>
+    <img src="popcraft_title.png" alt="PopCraft" onerror="this.style.display='none'">
+  </header>
 
-    <main class="main">
-        <div class="container">
-            <div class="search-section">
-                <form id="skinForm" class="search-form" autocomplete="off">
-                    <label for="username" class="visually-hidden">Minecraft Username</label>
-                    <div class="input-group">
-                        <input 
-                            type="text" 
-                            id="username" 
-                            name="username" 
-                            placeholder="Enter Minecraft username..."
-                            aria-label="Minecraft Username"
-                            required
-                        >
-                        <button type="submit" class="btn btn-primary">View Skin</button>
-                    </div>
-                </form>
-                
-                <div id="statusMessage" class="status-message" aria-live="polite"></div>
-            </div>
+  <main>
+    <!-- 3D Viewer -->
+    <div id="viewer" aria-hidden="true"></div>
 
-            <div class="skin-section">
-                <div class="skin-container">
-                    <div id="skinPreview" class="skin-preview" aria-label="3D Skin Preview"></div>
-                    
-                    <div class="skin-info">
-                        <div class="username-display" id="usernameDisplay"></div>
-                        <div class="skin-actions">
-                            <button id="importBtn" class="btn btn-import" disabled>
-                                <span>Import to Popcraft</span>
-                            </button>
-                            <a id="downloadBtn" class="btn btn-download" download href="#" disabled>
-                                <span>Download Skin</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div id="status">⏳ Ready</div>
 
-    <footer class="footer">
-        <div class="container">
-            <p>© 2025 Popcraft Skin Viewer | Not affiliated with Mojang Studios</p>
-        </div>
-    </footer>
+      <!-- Models -->
+      <div class="small">Model (preview)</div>
+      <select id="modelSelect"></select>
+      <div class="row">
+        <button id="reloadModel">Load</button>
+        <button id="refreshIndex" title="Reload index.json">↻</button>
+      </div>
 
-    <script src="https://unpkg.com/skinview3d@3.1.0/skinview3d.bundle.js" defer></script>
-    <script src="app.js" defer></script>
+      <hr style="opacity:.06">
+
+      <!-- Skins -->
+      <div class="small">Skin (preview)</div>
+      <div class="row">
+        <input id="username" placeholder="Minecraft username" style="flex:1">
+        <button id="fetchSkin">Get</button>
+      </div>
+      <label>
+        Upload skin
+        <input id="fileInput" type="file" accept="image/png" style="display:none">
+      </label>
+      <div id="fileName" class="muted">No skin uploaded</div>
+
+      <hr style="opacity:.06">
+
+      <!-- Box textures -->
+      <div class="small">Box texture</div>
+      <label>
+        Upload box texture
+        <input id="boxInput" type="file" accept="image/png" style="display:none">
+      </label>
+      <div id="boxName" class="muted">Using model default (if any)</div>
+
+      <!-- 🎨 Galerie visuelle -->
+      <div class="small" style="margin-top:10px">Or choose from gallery</div>
+      <div id="boxGallery"></div>
+
+      <hr style="opacity:.06">
+
+      <!-- Target item -->
+      <div class="small">Target item</div>
+      <select id="itemTarget"><option>Loading items…</option></select>
+
+      <!-- Pop name -->
+      <div class="small">Pop name (in-game)</div>
+      <input id="popName" value="MyPop">
+
+      <!-- Import / Export -->
+      <div class="row">
+        <button id="importPack">📂 Import existing pack (zip)</button>
+        <input id="packInput" type="file" accept=".zip" style="display:none">
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <button id="genPack">⚡ Generate & Download PopCraft.zip</button>
+        <button id="previewPack" title="Show what will be written (debug)">Preview</button>
+      </div>
+    </aside>
+  </main>
+
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+  // DOM refs
+  const statusEl = document.getElementById('status');
+  const modelSelect = document.getElementById('modelSelect');
+  const reloadModel = document.getElementById('reloadModel');
+  const refreshIndex = document.getElementById('refreshIndex');
+  const usernameEl = document.getElementById('username');
+  const fetchSkinBtn = document.getElementById('fetchSkin');
+  const fileInput = document.getElementById('fileInput');
+  const fileName = document.getElementById('fileName');
+  const boxInput = document.getElementById('boxInput');
+  const boxName = document.getElementById('boxName');
+  const boxGallery = document.getElementById('boxGallery');
+  const itemTarget = document.getElementById('itemTarget');
+  const popNameEl = document.getElementById('popName');
+  const importPackBtn = document.getElementById('importPack');
+  const packInput = document.getElementById('packInput');
+  const genPackBtn = document.getElementById('genPack');
+  const previewPackBtn = document.getElementById('previewPack');
+
+  // 3D setup
+  const viewer = document.getElementById('viewer');
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setSize(Math.max(320, viewer.clientWidth), Math.max(240, viewer.clientHeight));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  viewer.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111217);
+  const camera = new THREE.PerspectiveCamera(45, viewer.clientWidth/viewer.clientHeight, 0.1, 1000);
+  camera.position.set(0,2,6);
+  scene.add(new THREE.AmbientLight(0xffffff, .85));
+  scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x0a0a0a, 0.6));
+  const dir = new THREE.DirectionalLight(0xffffff,1);
+  dir.position.set(4,6,6); scene.add(dir);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.enableZoom = false; controls.autoRotate = true;
+
+  const loader = new GLTFLoader();
+  let modelGroup = new THREE.Group(); scene.add(modelGroup);
+
+  // state
+  let currentModelId = null;
+  let currentSkinBlob = null;
+  let currentBoxBlob = null;
+  let importedZip = null;
+
+  function setStatus(txt, color){ statusEl.textContent = txt; statusEl.style.color = color||''; }
+
+  // ===============================
+  // Galerie des boîtes
+  // ===============================
+  async function loadBoxGallery(){
+    try {
+      // On suppose un fichier box_color/index.json avec la liste des fichiers PNG
+      const res = await fetch("box_color/index.json");
+      const list = await res.json();
+      boxGallery.innerHTML = "";
+      list.forEach(file=>{
+        const div = document.createElement("div");
+        div.className = "box-option";
+        const img = document.createElement("img");
+        img.src = "box_color/" + file;
+        div.appendChild(img);
+        div.addEventListener("click", async ()=>{
+          document.querySelectorAll(".box-option").forEach(el=>el.classList.remove("active"));
+          div.classList.add("active");
+          const r = await fetch("box_color/" + file);
+          currentBoxBlob = await r.blob();
+          boxName.textContent = file + " (from gallery)";
+          setStatus("Box selected from gallery");
+        });
+        boxGallery.appendChild(div);
+      });
+    } catch(e){
+      console.warn("No gallery found", e);
+      boxGallery.innerHTML = "<div class='muted'>No gallery available</div>";
+    }
+  }
+
+  // ===============================
+  // Models
+  // ===============================
+  async function loadIndex(){
+    try{
+      const res = await fetch('3D_display/index.json');
+      const data = await res.json();
+      modelSelect.innerHTML = '';
+      data.forEach(item=>{
+        const opt = document.createElement('option');
+        opt.value = item; opt.textContent = item;
+        modelSelect.appendChild(opt);
+      });
+      if(data.length) await loadModel(data[0]);
+    }catch(e){
+      modelSelect.innerHTML = '<option>No models</option>';
+    }
+  }
+
+  async function loadModel(id){
+    currentModelId = id;
+    modelGroup.clear();
+    const glbPath = `3D_display/${id}/${id}.glb`;
+    try{
+      const gltf = await loader.loadAsync(glbPath);
+      const node = gltf.scene;
+      const box = new THREE.Box3().setFromObject(node);
+      const size = new THREE.Vector3(); box.getSize(size);
+      const s = 3.2 / (Math.max(size.x,size.y,size.z)||1);
+      node.scale.setScalar(s);
+      const center = new THREE.Vector3(); box.getCenter(center);
+      node.position.sub(center);
+      modelGroup.add(node);
+      setStatus("Model loaded: "+id);
+    }catch(e){ setStatus("Model error", "#ff9b9b"); }
+  }
+
+  // ===============================
+  // Items list
+  // ===============================
+  async function loadItemsList(){
+    try{
+      const res = await fetch("https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.21/items.json");
+      const items = await res.json();
+      itemTarget.innerHTML = "";
+      items.forEach(it=>{
+        const o = document.createElement("option");
+        o.value = it.name;
+        o.textContent = it.name;
+        itemTarget.appendChild(o);
+      });
+    }catch(e){
+      ["stick","iron_nugget","diamond"].forEach(name=>{
+        const o = document.createElement("option");
+        o.value=name; o.textContent=name;
+        itemTarget.appendChild(o);
+      });
+    }
+  }
+
+  // ===============================
+  // Events
+  // ===============================
+  reloadModel.addEventListener("click", ()=> loadModel(modelSelect.value));
+  refreshIndex.addEventListener("click", ()=> loadIndex());
+
+  fileInput.addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    currentSkinBlob = f; fileName.textContent=f.name; setStatus("Skin uploaded");
+  });
+  boxInput.addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    currentBoxBlob = f; boxName.textContent=f.name; setStatus("Box uploaded");
+  });
+
+  fetchSkinBtn.addEventListener("click", async ()=>{
+    const name = usernameEl.value.trim();
+    if(!name) return;
+    setStatus("Fetching skin...");
+    try{
+      const res = await fetch("https://api.ashcon.app/mojang/v2/user/" + encodeURIComponent(name));
+      const data = await res.json();
+      const url = data.textures?.skin?.url;
+      const b = await (await fetch(url)).blob();
+      currentSkinBlob = b; fileName.textContent=name+".png";
+      setStatus("Skin loaded: "+name);
+    }catch(e){ setStatus("Skin fetch failed", "#ff9b9b"); }
+  });
+
+  // TODO: genPackBtn logic (comme ton ancien script)
+
+  // Render loop
+  (function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); })();
+  window.addEventListener("resize", ()=>{
+    const w = Math.max(320, viewer.clientWidth), h = Math.max(240, viewer.clientHeight);
+    camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+  });
+
+  // init
+  loadItemsList();
+  loadIndex();
+  loadBoxGallery();
+
+  </script>
 </body>
 </html>
