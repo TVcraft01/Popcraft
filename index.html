@@ -20,8 +20,12 @@
     .small{ font-size:13px; color:#b9c2c7; margin-top:6px; }
     .row{ display:flex; gap:8px; align-items:center; }
     .muted{ color:#9aa4ab; font-size:13px; }
-    #meshListBox{ max-height:160px; overflow:auto; margin-top:6px; background:rgba(255,255,255,0.02); padding:8px; border-radius:6px }
-    code{ background:rgba(255,255,255,0.03); padding:2px 6px; border-radius:4px; }
+    hr{ border:none; border-top:1px solid rgba(255,255,255,0.05); margin:10px 0; }
+    #boxGallery{ display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px; margin-top:8px; }
+    .box-option{ border:2px solid transparent; border-radius:8px; overflow:hidden; cursor:pointer; transition:transform .15s,border .15s; }
+    .box-option:hover{ transform:scale(1.05); border-color:var(--accent); }
+    .box-option.active{ border-color:#00ffff; box-shadow:0 0 10px #00ffff60; }
+    .box-option img{ width:100%; height:100%; object-fit:cover; display:block; }
   </style>
 
   <!-- libs -->
@@ -55,29 +59,32 @@
         <button id="refreshIndex" title="Reload index.json">↻</button>
       </div>
 
-      <hr style="opacity:.06">
+      <hr>
 
       <div class="small">Skin (preview)</div>
       <div class="row">
         <input id="username" placeholder="Minecraft username" style="flex:1">
         <button id="fetchSkin">Get</button>
       </div>
-      <label style="display:inline-block; margin-top:6px; background:#333; color:#fff; padding:8px; border-radius:8px; cursor:pointer">
+      <label>
         Upload skin
         <input id="fileInput" type="file" accept="image/png" style="display:none">
       </label>
       <div id="fileName" class="muted">No skin uploaded</div>
 
-      <hr style="opacity:.06">
+      <hr>
 
-      <div class="small">Box texture (optional)</div>
-      <label style="display:inline-block; margin-top:6px; background:#333; color:#fff; padding:8px; border-radius:8px; cursor:pointer">
+      <div class="small">Box texture</div>
+      <label>
         Upload box texture
         <input id="boxInput" type="file" accept="image/png" style="display:none">
       </label>
       <div id="boxName" class="muted">Using model default (if any)</div>
 
-      <hr style="opacity:.06">
+      <div class="small" style="margin-top:8px">Or choose from gallery</div>
+      <div id="boxGallery"></div>
+
+      <hr>
 
       <div class="small">Target item</div>
       <select id="itemTarget"><option>Loading items…</option></select>
@@ -94,510 +101,164 @@
         <button id="genPack">⚡ Generate & Download PopCraft.zip</button>
         <button id="previewPack" title="Show what will be written (debug)">Preview</button>
       </div>
-
-      <div style="margin-top:12px">
-        <div class="small">Detected figure meshes (for preview)</div>
-        <div id="meshListBox"></div>
-      </div>
-
     </aside>
   </main>
 
   <script type="module">
-  import * as THREE from 'three';
-  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-  // DOM
-  const statusEl = document.getElementById('status');
-  const modelSelect = document.getElementById('modelSelect');
-  const reloadModel = document.getElementById('reloadModel');
-  const refreshIndex = document.getElementById('refreshIndex');
-  const usernameEl = document.getElementById('username');
-  const fetchSkinBtn = document.getElementById('fetchSkin');
-  const fileInput = document.getElementById('fileInput');
-  const fileName = document.getElementById('fileName');
-  const boxInput = document.getElementById('boxInput');
-  const boxName = document.getElementById('boxName');
-  const itemTarget = document.getElementById('itemTarget');
-  const popNameEl = document.getElementById('popName');
-  const importPackBtn = document.getElementById('importPack');
-  const packInput = document.getElementById('packInput');
-  const genPackBtn = document.getElementById('genPack');
-  const previewPackBtn = document.getElementById('previewPack');
-  const meshListBox = document.getElementById('meshListBox');
+    const statusEl = document.getElementById('status');
+    const viewer = document.getElementById('viewer');
+    const modelSelect = document.getElementById('modelSelect');
+    const reloadModel = document.getElementById('reloadModel');
+    const refreshIndex = document.getElementById('refreshIndex');
+    const usernameEl = document.getElementById('username');
+    const fetchSkinBtn = document.getElementById('fetchSkin');
+    const fileInput = document.getElementById('fileInput');
+    const fileName = document.getElementById('fileName');
+    const boxInput = document.getElementById('boxInput');
+    const boxName = document.getElementById('boxName');
+    const boxGallery = document.getElementById('boxGallery');
+    const itemTarget = document.getElementById('itemTarget');
+    const popNameEl = document.getElementById('popName');
+    const importPackBtn = document.getElementById('importPack');
+    const packInput = document.getElementById('packInput');
+    const genPackBtn = document.getElementById('genPack');
+    const previewPackBtn = document.getElementById('previewPack');
 
-  // three preview setup
-  const viewer = document.getElementById('viewer');
-  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-  renderer.setSize(Math.max(320, viewer.clientWidth), Math.max(240, viewer.clientHeight));
-  // color space safe assignment (r150+)
-  if('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
-  else if('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
-  viewer.appendChild(renderer.domElement);
+    let currentModelId = null;
+    let currentSkinBlob = null;
+    let currentBoxBlob = null;
+    let importedZip = null;
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x111217); // dark but not black
-  const camera = new THREE.PerspectiveCamera(45, viewer.clientWidth/viewer.clientHeight, 0.1, 1000);
-  camera.position.set(0,2,6);
-  scene.add(new THREE.AmbientLight(0xffffff, .85));
-  scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x0a0a0a, 0.6));
-  const dir = new THREE.DirectionalLight(0xffffff,1);
-  dir.position.set(4,6,6);
-  scene.add(dir);
+    const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setSize(Math.max(320, viewer.clientWidth), Math.max(240, viewer.clientHeight));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    viewer.appendChild(renderer.domElement);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true; controls.enableZoom = false; controls.autoRotate = true;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111217);
+    const camera = new THREE.PerspectiveCamera(45, viewer.clientWidth/viewer.clientHeight, 0.1, 1000);
+    camera.position.set(0,2,6);
+    scene.add(new THREE.AmbientLight(0xffffff, .85));
+    scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x0a0a0a, 0.6));
+    const dir = new THREE.DirectionalLight(0xffffff,1);
+    dir.position.set(4,6,6);
+    scene.add(dir);
 
-  const loader = new GLTFLoader();
-  let modelGroup = new THREE.Group(); scene.add(modelGroup);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
+    const loader = new GLTFLoader();
+    const modelGroup = new THREE.Group();
+    scene.add(modelGroup);
 
-  // state
-  let currentModelId = null;
-  let currentSkinBlob = null;
-  let currentBoxBlob = null;
-  let importedZip = null; // JSZip instance when user imports a pack
-  let importedZipFilename = null;
-  let detectedMeshes = []; // {name, mesh, overlay}
+    function setStatus(t, c){ statusEl.textContent=t; statusEl.style.color=c||''; }
 
-  // small helpers
-  function setStatus(txt, color){ statusEl.textContent = txt; statusEl.style.color = color || ''; console.log(txt); }
-  function toId(name){ return (name||'pop').toLowerCase().replace(/[^a-z0-9_]/g,'_'); }
-  function itemFileNameFrom(item){ // returns "stick.json" from "minecraft:stick"
-    const parts = (item||'minecraft:iron_nugget').split(':');
-    return (parts.length>1?parts[1]:parts[0]) + '.json';
-  }
-  function makeWhenArray(popName){ return [ popName, popName.toLowerCase(), `ipattern:${popName.toLowerCase()}`, `iregex:.${popName}.` ]; }
-
-  // load index.json for available 3D models
-  async function loadIndex(){
-    try{
-      const res = await fetch('3D_display/index.json');
-      if(!res.ok) throw new Error('index.json missing');
-      const data = await res.json();
-      modelSelect.innerHTML = '';
-      const list = Array.isArray(data) ? data : [];
-      list.forEach(item=>{
-        const opt = document.createElement('option');
-        if(typeof item === 'string'){ opt.value = item; opt.textContent = item; }
-        else { opt.value = item.id || item.file || item; opt.textContent = item.name || item.id || item.file || item; }
-        modelSelect.appendChild(opt);
-      });
-      if(list.length) await loadModel(modelSelect.value);
-      setStatus('Model list loaded');
-    }catch(e){
-      console.warn(e);
-      modelSelect.innerHTML = '<option value="">No models</option>';
-      setStatus('index.json not found (3D_display/index.json)', '#ff9b9b');
+    async function loadBoxGallery(){
+      try{
+        const res = await fetch('box_color/index.json');
+        const list = await res.json();
+        boxGallery.innerHTML = '';
+        list.forEach(name=>{
+          const div=document.createElement('div');
+          div.className='box-option';
+          const img=document.createElement('img');
+          img.src='box_color/'+name;
+          div.appendChild(img);
+          div.onclick=async()=>{
+            document.querySelectorAll('.box-option').forEach(d=>d.classList.remove('active'));
+            div.classList.add('active');
+            const blob=await (await fetch('box_color/'+name)).blob();
+            currentBoxBlob=blob;
+            boxName.textContent=name+' (from gallery)';
+            setStatus('✅ Box selected');
+          };
+          boxGallery.appendChild(div);
+        });
+      }catch(e){ boxGallery.innerHTML='<div class="muted">No gallery</div>'; }
     }
-  }
 
-  // load a glb for preview: center it, detect meshes
-  async function loadModel(id){
-    try{
-      setStatus(`Loading model ${id}...`);
-      currentModelId = id;
-      // clear previous
+    async function loadIndex(){
+      try{
+        const r=await fetch('3D_display/index.json');
+        const list=await r.json();
+        modelSelect.innerHTML='';
+        list.forEach(x=>{
+          const o=document.createElement('option');
+          o.value=x;o.textContent=x;
+          modelSelect.appendChild(o);
+        });
+        if(list.length) loadModel(list[0]);
+      }catch(e){ modelSelect.innerHTML='<option>No models</option>'; }
+    }
+
+    async function loadModel(id){
+      currentModelId=id;
       modelGroup.clear();
-      detectedMeshes = [];
-      meshListBox.innerHTML = '';
-
-      const glbPath = `3D_display/${id}/${id}.glb`;
-      const gltf = await loader.loadAsync(glbPath);
-      const sceneNode = gltf.scene;
-      // scale & center
-      const box = new THREE.Box3().setFromObject(sceneNode);
-      const size = new THREE.Vector3(); box.getSize(size);
-      const maxDim = Math.max(size.x,size.y,size.z)||1;
-      const target = 3.2; const s = target / maxDim;
-      sceneNode.scale.setScalar(s);
-      const box2 = new THREE.Box3().setFromObject(sceneNode); const center = new THREE.Vector3(); box2.getCenter(center);
-      sceneNode.position.sub(center);
-
-      modelGroup.add(sceneNode);
-
-      // detect meshes
-      let idx=0;
-      sceneNode.traverse(child=>{
-        if(child.isMesh){
-          const nm = child.name && child.name.trim() ? child.name.trim() : `mesh_${idx++}`;
-          // ensure material exists and is standard so lighting works (fix black)
-          if(!child.material || !(child.material.isMeshStandardMaterial || child.material.isMeshPhysicalMaterial)){
-            child.material = new THREE.MeshStandardMaterial({ color: 0xdddddd });
-          }
-          detectedMeshes.push({ name: nm, mesh: child, overlay: nm.toLowerCase().startsWith('fig_2nd_layer_') || nm.toLowerCase().includes('overlay') });
-        }
-      });
-
-      // try load model default box texture (if exists)
       try{
-        const r = await fetch(`3D_display/${id}/box_template_blank.png`);
-        if(r.ok){ currentBoxBlob = await r.blob(); boxName.textContent = 'Model default found'; }
-      }catch(e){ /* ignore */ }
-
-      updateMeshListUI();
-      setStatus(`Model ${id} loaded`);
-      // apply skin/box previews if blobs exist
-      if(currentSkinBlob) applySkinToPreview();
-      if(currentBoxBlob) applyBoxToPreview();
-    }catch(e){
-      console.error(e);
-      setStatus('Error loading model', '#ff9b9b');
+        const gltf=await loader.loadAsync(`3D_display/${id}/${id}.glb`);
+        const node=gltf.scene;
+        const box=new THREE.Box3().setFromObject(node);
+        const size=new THREE.Vector3();box.getSize(size);
+        const s=3.2/(Math.max(size.x,size.y,size.z)||1);
+        node.scale.setScalar(s);
+        const c=new THREE.Vector3();box.getCenter(c);node.position.sub(c);
+        modelGroup.add(node);
+        setStatus('Model loaded: '+id);
+      }catch(e){ setStatus('❌ Model error','#f88'); }
     }
-  }
 
-  function updateMeshListUI(){
-    meshListBox.innerHTML = '';
-    if(!detectedMeshes.length){ meshListBox.innerHTML = '<div class="muted">No mesh detected</div>'; return; }
-    detectedMeshes.forEach((m,i)=>{
-      const el = document.createElement('div');
-      el.style.display='flex'; el.style.justifyContent='space-between'; el.style.alignItems='center';
-      const left = document.createElement('div'); left.textContent = m.name;
-      const right = document.createElement('div');
-      const cb = document.createElement('input'); cb.type='checkbox'; cb.checked = !!m.overlay;
-      cb.title = 'Overlay (second layer)';
-      cb.addEventListener('change', ()=>{ m.overlay = cb.checked; applySkinToPreview(); });
-      right.appendChild(cb);
-      el.appendChild(left); el.appendChild(right);
-      meshListBox.appendChild(el);
-    });
-  }
-
-  // apply skin texture to fig_ meshes; respects overlay flag
-  function applySkinToPreview(){
-    if(!currentSkinBlob || !detectedMeshes.length) return;
-    const url = URL.createObjectURL(currentSkinBlob);
-    const tex = new THREE.TextureLoader().load(url, ()=>{
-      // ensure encoding / filters to avoid black/blur
-      try{ if('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace; else tex.encoding = THREE.sRGBEncoding; } catch(e){}
-      tex.flipY = false;
-      tex.magFilter = THREE.NearestFilter;
-      tex.minFilter = THREE.NearestFilter;
-      tex.generateMipmaps = false;
-      tex.needsUpdate = true;
-      // apply
-      detectedMeshes.forEach(item=>{
-        const m = item.mesh;
-        if(!m) return;
-        // dispose old material
-        try{ if(m.material){ m.material.dispose?.(); } }catch(e){}
-        if(item.name.toLowerCase().startsWith('fig_')){
-          if(item.overlay){
-            m.material = new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.05, depthWrite: false, side: THREE.DoubleSide });
-          } else {
-            m.material = new THREE.MeshStandardMaterial({ map: tex, transparent: false, alphaTest: 0.01, depthWrite: true, side: THREE.FrontSide });
-          }
-          m.material.needsUpdate = true;
-        }
-      });
-      URL.revokeObjectURL(url);
-      renderer.render(scene, camera);
-    });
-  }
-
-  // apply box texture to box_ meshes
-  function applyBoxToPreview(){
-    if(!currentBoxBlob || !detectedMeshes.length) return;
-    const url = URL.createObjectURL(currentBoxBlob);
-    const tex = new THREE.TextureLoader().load(url, ()=>{
-      try{ if('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace; else tex.encoding = THREE.sRGBEncoding; } catch(e){}
-      tex.flipY = false;
-      tex.magFilter = THREE.NearestFilter;
-      tex.minFilter = THREE.NearestFilter;
-      tex.generateMipmaps = false;
-      tex.needsUpdate = true;
-      detectedMeshes.forEach(item=>{
-        const m = item.mesh;
-        if(!m) return;
-        if(item.name.toLowerCase().startsWith('box_')){
-          try{ m.material.dispose?.(); }catch(e){}
-          m.material = new THREE.MeshStandardMaterial({ map: tex, side: THREE.FrontSide });
-          m.material.needsUpdate = true;
-        }
-      });
-      URL.revokeObjectURL(url);
-      renderer.render(scene, camera);
-    });
-  }
-
-  // load list of minecraft items (from prismarinejs) to populate select
-  async function loadItemsList(){
-    const versions = ['1.21','1.20.6','1.20.4','1.20.1'];
-    let items = null;
-    for(const v of versions){
+    async function loadItemsList(){
       try{
-        const url = `https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/${v}/items.json`;
-        const res = await fetch(url);
-        if(!res.ok) continue;
-        const data = await res.json();
-        // data is an array of item objects; try to map to names
-        items = data.map(it => it.name || it.id || it);
-        if(items && items.length) break;
-      }catch(e){ console.warn('items fetch failed for', v, e); }
-    }
-    itemTarget.innerHTML = '';
-    if(!items){
-      // fallback: common items list
-      const fallback = ['minecraft:iron_nugget','minecraft:stick','minecraft:stone','minecraft:diamond'];
-      fallback.forEach(i => { const o = document.createElement('option'); o.value = i; o.textContent = i; itemTarget.appendChild(o); });
-      itemTarget.value = 'minecraft:iron_nugget';
-      setStatus('Items list failed to load, used fallback', '#ffcc00');
-      return;
-    }
-    items.forEach(name => {
-      const val = `minecraft:${name}`;
-      const o = document.createElement('option');
-      o.value = val;
-      o.textContent = name;
-      itemTarget.appendChild(o);
-    });
-    // default to iron nugget if present otherwise first
-    if(Array.from(itemTarget.options).some(o=>o.value==='minecraft:iron_nugget')) itemTarget.value='minecraft:iron_nugget';
-    else itemTarget.selectedIndex = 0;
-  }
-
-  // import pack (zip) — store JSZip instance (we will merge later)
-  importPackBtn.addEventListener('click', ()=> packInput.click());
-  packInput.addEventListener('change', async (e)=>{
-    const f = e.target.files[0];
-    if(!f) return;
-    setStatus('Reading zip...');
-    try{
-      const ab = await f.arrayBuffer();
-      importedZip = await JSZip.loadAsync(ab);
-      importedZipFilename = f.name;
-      setStatus(`Imported ${f.name} — ${Object.keys(importedZip.files).length} files`);
-    }catch(err){ console.error(err); setStatus('Failed to read zip', '#ff9b9b'); }
-  });
-
-  // file inputs for skin and box
-  fileInput.addEventListener('change', (e)=>{
-    const f = e.target.files[0]; if(!f) return;
-    currentSkinBlob = f; fileName.textContent = f.name; setStatus('Skin uploaded'); applySkinToPreview();
-  });
-  boxInput.addEventListener('change', (e)=>{
-    const f = e.target.files[0]; if(!f) return;
-    currentBoxBlob = f; boxName.textContent = f.name; setStatus('Box texture uploaded'); applyBoxToPreview();
-  });
-
-  // fetch skin via Ashcon (more reliable than Mojang endpoint)
-  fetchSkinBtn.addEventListener('click', async ()=>{
-    const name = usernameEl.value.trim();
-    if(!name) return setStatus('Enter username', '#ffcc00');
-    setStatus(`Fetching skin ${name}...`);
-    try{
-      const res = await fetch('https://api.ashcon.app/mojang/v2/user/' + encodeURIComponent(name));
-      if(!res.ok) throw new Error('user not found');
-      const data = await res.json();
-      const url = data.textures?.skin?.url;
-      if(!url) throw new Error('skin url missing');
-      const b = await (await fetch(url)).blob();
-      currentSkinBlob = b;
-      fileName.textContent = `${data.username}.png`;
-      setStatus(`Skin ${data.username} loaded`);
-      applySkinToPreview();
-    }catch(e){ console.warn(e); setStatus('User not found / skin fetch failed', '#ff9b9b'); }
-  });
-
-  // helper: deep-copy importedZip into a new JSZip to safely mutate
-  async function cloneImportedZip(zipIn){
-    const z = new JSZip();
-    const keys = Object.keys(zipIn.files);
-    await Promise.all(keys.map(async path=>{
-      const file = zipIn.files[path];
-      if(file.dir) return; // directories are implicit
-      const content = await zipIn.file(path).async('arraybuffer');
-      z.file(path, content);
-    }));
-    return z;
-  }
-
-  // generate pack: merges into importedZip (if present), edits/creates files
-  genPackBtn.addEventListener('click', async ()=>{
-    // validation
-    const modelId = currentModelId || modelSelect.value;
-    if(!modelId) { setStatus('No model selected', '#ffcc00'); return; }
-    const popName = (popNameEl.value || '').trim();
-    if(!popName){ setStatus('Enter a pop name', '#ffcc00'); return; }
-    if(!currentSkinBlob){ setStatus('Upload or fetch a skin first', '#ffcc00'); return; }
-
-    setStatus('Building resource pack (merging if needed)...');
-
-    // start new zip based on importedZip (merge behavior)
-    let zip = new JSZip();
-    if(importedZip){
-      try{ zip = await cloneImportedZip(importedZip); } catch(e){ console.warn('clone failed', e); zip = new JSZip(); }
+        const res=await fetch('https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.21/items.json');
+        const data=await res.json();
+        itemTarget.innerHTML='';
+        data.forEach(it=>{
+          const o=document.createElement('option');
+          o.value=it.name;o.textContent=it.name;
+          itemTarget.appendChild(o);
+        });
+      }catch(e){
+        ['iron_nugget','stick','diamond'].forEach(n=>{
+          const o=document.createElement('option');
+          o.value=n;o.textContent=n;
+          itemTarget.appendChild(o);
+        });
+      }
     }
 
-    const popId = toId(popName);
-    const itemId = (itemTarget.value || 'minecraft:iron_nugget').trim();
-    const itemFilePath = `assets/minecraft/items/${itemFileNameFrom(itemId)}`;
-    const modelOutPath = `assets/minecraft/models/block/pop/${popId}.json`;
-    const textureSkinPath = `assets/minecraft/textures/item/${popId}/skin.png`;
-    const textureBoxPath = `assets/minecraft/textures/item/${popId}/box_texture.png`;
-
-    // 1) pack.mcmeta (create if missing)
-    const packMetaPath = 'pack.mcmeta';
-    if(!zip.file(packMetaPath)){
-      const meta = {
-        pack: {
-          pack_format: 49,
-          supported_formats: [49, 999],
-          description: "§a§lʏᴏᴜʀ sᴋɪɴ. ʏᴏᴜʀ ʙᴏx.\nʏᴏᴜʀ ᴘᴏᴘ ғɪɢᴜʀᴇ."
-        }
-      };
-      zip.file(packMetaPath, JSON.stringify(meta, null, 2));
-    }
-
-    // 2) pack.png fallback from pop_models/pack.png (if present)
-    const packPngPath = 'pack.png';
-    if(!zip.file(packPngPath)){
+    fileInput.onchange=e=>{
+      const f=e.target.files[0];if(!f)return;
+      currentSkinBlob=f;fileName.textContent=f.name;setStatus('✅ Skin uploaded');
+    };
+    boxInput.onchange=e=>{
+      const f=e.target.files[0];if(!f)return;
+      currentBoxBlob=f;boxName.textContent=f.name;setStatus('✅ Box uploaded');
+    };
+    fetchSkinBtn.onclick=async()=>{
+      const name=usernameEl.value.trim();if(!name)return;
+      setStatus('Fetching skin...');
       try{
-        const p = await fetch('pop_models/pack.png');
-        if(p.ok){ const b = await p.blob(); zip.file(packPngPath, b); }
-      }catch(e){}
-    }
-
-    // 3) ITEM JSON: ensure minecraft:select and add a case safely
-    const newCase = {
-      when: makeWhenArray(popName),
-      model: { type: "minecraft:model", model: `minecraft:block/pop/${popId}` }
+        const res=await fetch('https://api.ashcon.app/mojang/v2/user/'+encodeURIComponent(name));
+        const d=await res.json();const url=d.textures?.skin?.url;
+        const blob=await (await fetch(url)).blob();
+        currentSkinBlob=blob;fileName.textContent=name+'.png';
+        setStatus('✅ Skin loaded');
+      }catch(e){setStatus('❌ Skin failed','#f88');}
     };
 
-    try{
-      if(zip.file(itemFilePath)){
-        // existing file -> try parse
-        const txt = await zip.file(itemFilePath).async('string');
-        let parsed = null;
-        try{ parsed = JSON.parse(txt); } catch(e){ parsed = null; }
-        if(parsed && parsed.model && parsed.model.type === 'minecraft:select' && Array.isArray(parsed.model.cases)){
-          // check duplicate
-          const exists = parsed.model.cases.some(c=>{
-            try{ const s = JSON.stringify(c).toLowerCase(); return s.includes(popName.toLowerCase()) || s.includes(popId.toLowerCase()); } catch(e){ return false; }
-          });
-          if(!exists){
-            parsed.model.cases.push(newCase);
-            zip.file(itemFilePath, JSON.stringify(parsed, null, 2));
-            setStatus('Item file updated (select case added)');
-          } else setStatus('Pop name already present in item select cases — skipping item edit');
-        } else {
-          // backup and replace with select wrapper
-          zip.file(itemFilePath + '.bak', txt);
-          const selectObj = {
-            model: {
-              type: "minecraft:select",
-              property: "minecraft:component",
-              component: "minecraft:custom_name",
-              cases: [ newCase ],
-              fallback: { type: "minecraft:model", model: "minecraft:item/iron_nugget" }
-            }
-          };
-          zip.file(itemFilePath, JSON.stringify(selectObj, null, 2));
-          setStatus('Item file replaced with select (original backed up)');
-        }
-      } else {
-        // create new item select file
-        const selectObj = {
-          model: {
-            type: "minecraft:select",
-            property: "minecraft:component",
-            component: "minecraft:custom_name",
-            cases: [ newCase ],
-            fallback: { type: "minecraft:model", model: "minecraft:item/iron_nugget" }
-          }
-        };
-        zip.file(itemFilePath, JSON.stringify(selectObj, null, 2));
-        setStatus('Item file created (select structure)');
-      }
-    }catch(e){
-      console.error('Item editing error', e);
-      setStatus('Failed to update item file', '#ff9b9b');
-    }
+    reloadModel.onclick=()=>loadModel(modelSelect.value);
+    refreshIndex.onclick=()=>loadIndex();
 
-    // 4) model JSON: try template from pop_models/<modelId>.json, else basic_pop.json, else minimal mapping
-    let modelJson = null;
-    try{
-      let templateRes = await fetch(`pop_models/${modelId}.json`);
-      if(!templateRes.ok) templateRes = await fetch(`pop_models/basic_pop.json`);
-      if(templateRes.ok){
-        const txt = await templateRes.text();
-        modelJson = JSON.parse(txt);
-        // remap textures entries to point to our pop textures
-        if(modelJson.textures && typeof modelJson.textures === 'object'){
-          for(const k of Object.keys(modelJson.textures)){
-            const v = String(modelJson.textures[k]).toLowerCase();
-            if(v.includes('skin') || v.includes('player') || k === '1') modelJson.textures[k] = `item/${popId}/skin`;
-            if(v.includes('box') || v.includes('box_template') || k === '2') modelJson.textures[k] = `item/${popId}/box_texture`;
-          }
-        } else {
-          modelJson.textures = { "1": `item/${popId}/skin`, "2": `item/${popId}/box_texture` };
-        }
-      } else {
-        modelJson = { textures: { "1": `item/${popId}/skin`, "2": `item/${popId}/box_texture` } };
-      }
-    }catch(e){
-      console.warn('model template fetch failed', e);
-      modelJson = { textures: { "1": `item/${popId}/skin`, "2": `item/${popId}/box_texture` } };
-    }
-    zip.file(modelOutPath, JSON.stringify(modelJson, null, 2));
+    (function anim(){requestAnimationFrame(anim);controls.update();renderer.render(scene,camera);})();
+    window.onresize=()=>{const w=viewer.clientWidth,h=viewer.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h);};
 
-    // 5) textures: create folder and write skin.png and box_texture.png
-    zip.file(textureSkinPath, currentSkinBlob);
-    if(currentBoxBlob) zip.file(textureBoxPath, currentBoxBlob);
-    else {
-      // try model folder fallback
-      try{
-        const r = await fetch(`3D_display/${modelId}/box_template_blank.png`);
-        if(r.ok) zip.file(textureBoxPath, await r.blob());
-      }catch(e){}
-    }
-
-    // 6) generate zip and download
-    setStatus('Generating zip...');
-    try{
-      const outBlob = await zip.generateAsync({ type: 'blob' });
-      saveAs(outBlob, `PopCraft_${popId}.zip`);
-      setStatus('Pack generated — download started.');
-    }catch(e){
-      console.error(e);
-      setStatus('Failed to generate zip', '#ff9b9b');
-    }
-  });
-
-  // preview button: quick debug
-  previewPackBtn.addEventListener('click', ()=>{
-    const modelId = currentModelId || modelSelect.value; const popName = (popNameEl.value||'').trim(); if(!popName) return setStatus('enter pop name', '#ffcc00');
-    const popId = toId(popName); const itemId = (itemTarget.value||'minecraft:iron_nugget').trim();
-    const when = makeWhenArray(popName);
-    alert('Preview:\n- item -> ' + itemFileNameFrom(itemId) + '\n- model -> ' + `assets/minecraft/models/block/pop/${popId}.json` + '\n- textures -> ' + `assets/minecraft/textures/item/${popId}/skin.png` + ' & box_texture.png\n\nCase object:\n' + JSON.stringify({ when, model:{ type:'minecraft:model', model:`minecraft:block/pop/${popId}` } }, null, 2));
-  });
-
-  // render loop + responsive
-  (function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); })();
-  window.addEventListener('resize', ()=>{ const w=Math.max(320, viewer.clientWidth), h=Math.max(240, viewer.clientHeight); camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h); });
-
-  // load items + index at start
-  loadItemsList();
-  loadIndex();
-
-  // UI bindings
-  refreshIndex.addEventListener('click', ()=> loadIndex());
-  reloadModel.addEventListener('click', ()=> loadModel(modelSelect.value));
-  modelSelect.addEventListener('change', ()=> loadModel(modelSelect.value));
-  // drag & drop for zip import (optional)
-  document.addEventListener('dragover', e=>e.preventDefault());
-  document.addEventListener('drop', async e=>{
-    e.preventDefault();
-    const f = e.dataTransfer.files && e.dataTransfer.files[0];
-    if(f && f.name.toLowerCase().endsWith('.zip')){
-      setStatus('Reading dropped zip...');
-      const ab = await f.arrayBuffer();
-      importedZip = await JSZip.loadAsync(ab);
-      importedZipFilename = f.name;
-      setStatus(`Imported ${f.name}`);
-    }
-  });
-
+    loadItemsList();
+    loadIndex();
+    loadBoxGallery();
   </script>
 </body>
 </html>
