@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// ========== CONFIGURATION ==========
+// Configuration globale
 const CONFIG = {
   API: {
     MOJANG_USERNAME: 'https://api.mojang.com/users/profiles/minecraft/',
@@ -15,7 +15,7 @@ const CONFIG = {
   TIMEOUT: 8000,
 };
 
-// ========== DOM CACHE ==========
+// Sélection DOM
 const DOM = {
   status: document.getElementById('status'),
   modelSelect: document.getElementById('modelSelect'),
@@ -40,4 +40,6 @@ const DOM = {
   themToggle: document.getElementById('themToggle'),
   infoBtn: document.getElementById('infoBtn'),
   infoModal: document.getElementById('infoModal'),
-  autoSaveStatus: document.getElementById('autoSaveStatus'
+  autoSaveStatus: document.getElementById('autoSaveStatus'),
+  viewerCanvas: document.getElementById('viewerCanvas'),
+};
