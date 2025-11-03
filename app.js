@@ -43,3 +43,32 @@ const DOM = {
   autoSaveStatus: document.getElementById('autoSaveStatus'),
   viewerCanvas: document.getElementById('viewerCanvas'),
 };
+// ========== THREE.JS SETUP ==========
+const viewer = document.getElementById('viewer');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+const startW = Math.max(320, viewer.clientWidth);
+const startH = Math.max(240, viewer.clientHeight);
+renderer.setSize(startW, startH);
+DOM.viewerCanvas.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1d20);
+const camera = new THREE.PerspectiveCamera(45, startW / startH, 0.1, 1000);
+camera.position.set(0, 1.5, 4);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+scene.add(new THREE.HemisphereLight(0xbfd7ff, 0x0a0a0a, 0.6));
+const dir = new THREE.DirectionalLight(0xffffff, 1);
+dir.position.set(3, 5, 5);
+scene.add(dir);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enableZoom = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 4;
+
+const loader = new GLTFLoader();
+let modelGroup = new THREE.Group();
+scene.add(modelGroup);
