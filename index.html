@@ -5,12 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PopCraft — Figurine Pop Minecraft Personnalisée</title>
   <link rel="stylesheet" href="styles.css">
-  
   <!-- libs -->
   <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-
   <!-- three importmap for 3D preview -->
   <script type="importmap">
     { "imports": {
@@ -32,17 +30,13 @@
       </div>
     </div>
   </header>
-
   <main>
     <div id="viewer" class="viewer-container" aria-hidden="true">
       <div class="viewer-hint">🖱️ Utilisez la souris pour tourner • 🔍 Zoom: molette</div>
       <div id="viewerCanvas"></div>
     </div>
-
     <aside id="sidebar" class="sidebar">
       <div id="status" class="status-box">⏳ Prêt</div>
-
-      <!-- === MODÈLE 3D === -->
       <section class="panel">
         <h3>📦 Modèle 3D</h3>
         <select id="modelSelect" class="select-input">
@@ -51,3 +45,84 @@
         <div class="button-group">
           <button id="reloadModel" class="btn btn-primary">Charger</button>
           <button id="refreshIndex" class="btn btn-secondary" title="Actualiser la liste">↻</button>
+        </div>
+      </section>
+      <hr class="divider">
+      <section class="panel">
+        <h3>🎁 Sélection de boîte</h3>
+        <div id="boxGallery" class="gallery"></div>
+        <div id="boxGalleryStatus" class="status-text">Chargement de la galerie...</div>
+        <div class="upload-section">
+          <label class="btn btn-secondary upload-btn">
+            📤 Télécharger une texture
+            <input id="boxUpload" type="file" accept="image/png,image/jpeg" hidden>
+          </label>
+          <button id="previewBox" class="btn btn-secondary">👁️ Aperçu</button>
+        </div>
+      </section>
+      <hr class="divider">
+      <section class="panel">
+        <h3>👤 Skin Minecraft</h3>
+        <div class="input-group">
+          <input id="username" placeholder="Nom d'utilisateur Minecraft" class="input-field">
+          <button id="fetchSkin" class="btn btn-primary">Récupérer</button>
+        </div>
+        <label class="btn btn-secondary upload-btn" style="margin-top: 8px;">
+          📂 Charger un fichier
+          <input id="fileInput" type="file" accept="image/png" hidden>
+        </label>
+        <div id="fileName" class="status-text">Aucun skin téléchargé</div>
+      </section>
+      <hr class="divider">
+      <section class="panel">
+        <h3>⚔️ Objet cible</h3>
+        <div id="itemSelectContainer" class="item-select-wrapper">
+          <select id="itemTarget" class="select-input">
+            <option>Chargement des objets...</option>
+          </select>
+          <div id="itemPreview" class="item-preview">
+            <img id="itemPreviewImg" src="" alt="Aperçu de l'objet" style="display:none;">
+            <span id="itemPreviewPlaceholder" class="placeholder">Pas de preview</span>
+          </div>
+        </div>
+      </section>
+      <hr class="divider">
+      <section class="panel">
+        <h3>🏷️ Nom personnalisé</h3>
+        <input id="popName" class="input-field" value="MonPop" placeholder="Nom unique pour votre Pop">
+      </section>
+      <hr class="divider">
+      <section class="panel">
+        <h3>⚡ Génération</h3>
+        <div class="button-group">
+          <button id="importPack" class="btn btn-secondary full-width">📂 Importer un pack (ZIP)</button>
+          <input id="packInput" type="file" accept=".zip" hidden>
+        </div>
+        <div class="button-group">
+          <button id="genPack" class="btn btn-success full-width">⚡ Générer & Télécharger</button>
+          <button id="previewPack" class="btn btn-secondary full-width" title="Afficher la structure">👁️ Aperçu</button>
+        </div>
+        <div id="autoSaveStatus" class="status-text">💾 Auto-sauvegarde locale active</div>
+      </section>
+    </aside>
+  </main>
+  <!-- Modal Info -->
+  <div id="infoModal" class="modal" hidden>
+    <div class="modal-content">
+      <button class="modal-close">✕</button>
+      <h2>À propos de PopCraft</h2>
+      <p>PopCraft transforme votre skin Minecraft en figurine Pop stylisée avec une boîte personnalisée.</p>
+      <h3>Fonctionnalités:</h3>
+      <ul>
+        <li>✅ Aperçu 3D en temps réel</li>
+        <li>✅ Galerie de textures de boîte</li>
+        <li>✅ Images d'aperçu des objets Minecraft</li>
+        <li>✅ Génération de pack de ressources</li>
+        <li>✅ Sauvegarde automatique locale</li>
+      </ul>
+      <p><strong>Version:</strong> 2.0 (Optimisée)</p>
+    </div>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
