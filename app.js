@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Configuration globale
 const CONFIG = {
   API: {
     MOJANG_USERNAME: 'https://api.mojang.com/users/profiles/minecraft/',
@@ -15,7 +14,6 @@ const CONFIG = {
   TIMEOUT: 8000,
 };
 
-// Sélection DOM
 const DOM = {
   status: document.getElementById('status'),
   modelSelect: document.getElementById('modelSelect'),
@@ -43,6 +41,7 @@ const DOM = {
   autoSaveStatus: document.getElementById('autoSaveStatus'),
   viewerCanvas: document.getElementById('viewerCanvas'),
 };
+
 // ========== THREE.JS SETUP ==========
 const viewer = document.getElementById('viewer');
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -72,6 +71,7 @@ controls.autoRotateSpeed = 4;
 const loader = new GLTFLoader();
 let modelGroup = new THREE.Group();
 scene.add(modelGroup);
+
 // État global
 let loadedSkin = null;
 let loadedBox = null;
@@ -120,6 +120,7 @@ function loadModel3D(meta) {
     }
   );
 }
+
 // Chargement du catalogue de modèles 3D
 async function fetchModelIndex() {
   setStatus("Chargement de la liste des modèles 3D…");
@@ -166,6 +167,7 @@ DOM.modelSelect.addEventListener('change', async e => {
   const idx = DOM.modelSelect.selectedIndex;
   loadModel3D(models[idx]);
 });
+
 // Chargement de la galerie de boîtes couleurs
 async function fetchBoxGallery() {
   let boxes = [];
@@ -225,6 +227,7 @@ DOM.boxUpload.addEventListener('change', e => {
   };
   reader.readAsDataURL(file);
 });
+
 // Chargement des items Minecraft
 async function fetchItemsList() {
   let items = [];
@@ -269,7 +272,6 @@ DOM.itemTarget.addEventListener('change', e => {
   updateItemPreview(e.target.value);
 });
 
-// Initial refresh items
 refreshItemDropdown();
 
 // SKIN MINECRAFT
@@ -279,7 +281,29 @@ DOM.fetchSkin.addEventListener('click', async () => {
     setStatus("Veuillez entrer un pseudo Minecraft.", "error");
     return;
   }
-  setStatus("Recherche du skin Minecraft
+  setStatus("Recherche du skin Minecraft...");
+  try {
+    DOM.fileName.textContent = "Skin téléchargé : " + username;
+    loadedSkin = `${CONFIG.API.MINOTAR_SKIN}${username}`;
+    setStatus("Skin chargé !");
+  } catch (err) {
+    setStatus("Impossible de charger le skin.", "error");
+  }
+});
+
+// Import skin png
+DOM.fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    loadedSkin = ev.target.result;
+    DOM.fileName.textContent = "Skin local chargé";
+    setStatus("Skin importé !");
+  };
+  reader.readAsDataURL(file);
+});
+
 // Nom custom et POP génération (exemple)
 DOM.genPack.addEventListener('click', () => {
   setStatus("⚡ Génération du pack…");
@@ -307,7 +331,6 @@ DOM.themToggle.addEventListener('click', () => {
 
 // Initialisation générale
 window.addEventListener('DOMContentLoaded', () => {
-  // Par défaut, mode sombre
   document.body.setAttribute('data-theme', 'dark');
   refreshModelDropdown();
   refreshBoxGallery();
