@@ -1,43 +1,39 @@
-// ===============================
-// 🧱 PopCraft - Box Index Builder
-// ===============================
-// Génère un fichier box_color/index.json listant toutes les textures (.png/.jpg)
-// à exécuter avec: node generate_box_index.js
-
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const BOX_DIR = './box_color';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const BOX_DIR = path.join(__dirname, 'box_color');
 const OUTPUT_FILE = path.join(BOX_DIR, 'index.json');
 
 async function main() {
   try {
-    console.log('🔍 Lecture du dossier', BOX_DIR);
+    console.log('🔍 Lecture du dossier:', BOX_DIR);
 
-    // Vérifie si le dossier existe
     if (!fs.existsSync(BOX_DIR)) {
-      console.error('❌ Dossier introuvable :', BOX_DIR);
+      console.error('❌ Dossier introuvable:', BOX_DIR);
       process.exit(1);
     }
 
-    // Récupère tous les fichiers .png et .jpg
     const files = fs.readdirSync(BOX_DIR)
-      .filter(f => /\.(png|jpg|jpeg)$/i.test(f))
-      .sort((a, b) => a.localeCompare(b));
+      .filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    // Génère un tableau d’objets (utile si tu veux ajouter des infos plus tard)
-    const jsonData = files.map(name => ({
-      name: name.replace(/\.[^.]+$/, ''), // "red_box" au lieu de "red_box.png"
-      file: name,
-      url: `box_color/${name}`
-    }));
+    if (files.length === 0) {
+      console.warn('⚠️ Aucune texture trouvée dans', BOX_DIR);
+    }
 
-    // Écrit le JSON joliment formaté
+    // Format: simple array de noms de fichiers
+    const jsonData = files;
+
     fs.writeFileSync(OUTPUT_FILE, JSON.stringify(jsonData, null, 2));
-    console.log(`✅ ${files.length} textures listées dans ${OUTPUT_FILE}`);
+    console.log(`✅ ${files.length} texture(s) listée(s) dans ${OUTPUT_FILE}`);
+    console.log('Fichiers indexés:', files);
 
   } catch (err) {
-    console.error('💥 Erreur :', err);
+    console.error('💥 Erreur:', err.message);
     process.exit(1);
   }
 }
